@@ -24,7 +24,7 @@ from pydantic.networks import AnyUrl
 from ..config import load_env_config
 from ..core.engine import CognitiveMemoryEngine
 from ..core.exceptions import CMEError
-from ..task_manager import task_manager, create_immediate_response
+from ..task_manager import create_immediate_response, task_manager
 
 # Configure logging to stderr for MCP servers
 logging.basicConfig(
@@ -50,7 +50,7 @@ async def initialize_engine() -> CognitiveMemoryEngine:
             logger.info("Loading configuration from environment...")
             config = load_env_config()
             logger.info(f"Using LLM model: {config.llm_model}")
-            
+
             logger.info("Initializing Cognitive Memory Engine...")
             engine = CognitiveMemoryEngine(config)
             await engine.initialize()
@@ -397,7 +397,7 @@ async def handle_list_tools() -> list[types.Tool]:
                         "description": "The document content to store"
                     },
                     "root_concept": {
-                        "type": "string", 
+                        "type": "string",
                         "description": "Main concept of the document"
                     },
                     "domain": {
@@ -433,7 +433,7 @@ async def handle_list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
-            name="browse_knowledge_shelf", 
+            name="browse_knowledge_shelf",
             description="Browse concepts in a knowledge domain",
             inputSchema={
                 "type": "object",
@@ -451,7 +451,7 @@ async def handle_list_tools() -> list[types.Tool]:
             name="query_blended_knowledge",
             description="Query both conversation and document knowledge simultaneously",
             inputSchema={
-                "type": "object", 
+                "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
@@ -463,7 +463,7 @@ async def handle_list_tools() -> list[types.Tool]:
                         "default": True
                     },
                     "include_conversational": {
-                        "type": "boolean", 
+                        "type": "boolean",
                         "description": "Include conversation insights",
                         "default": True
                     }
@@ -539,23 +539,23 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 task_id = task_manager.create_task(
                     description=f"Storing conversation with {len(conversation)} messages"
                 )
-                
+
                 # Start background processing
                 await task_manager.start_background_task(
-                    task_id, 
-                    cme.store_conversation, 
-                    conversation, 
+                    task_id,
+                    cme.store_conversation,
+                    conversation,
                     context
                 )
-                
+
                 # Return immediately with task info
                 response = create_immediate_response(
-                    task_id, 
+                    task_id,
                     f"Processing conversation with {len(conversation)} messages"
                 )
-                
+
                 return [types.TextContent(type="text", text=json.dumps(response, indent=2))]
-                
+
             except Exception as e:
                 logger.error(f"Error starting conversation storage: {str(e)}")
                 error_response = {
@@ -706,17 +706,17 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             status_filter = arguments.get("status_filter", "all")
             try:
                 all_tasks = task_manager.get_all_tasks()
-                
+
                 if status_filter != "all":
                     # Filter by status
                     filtered_tasks = {
-                        task_id: task_info 
+                        task_id: task_info
                         for task_id, task_info in all_tasks.items()
                         if task_info.status.value == status_filter
                     }
                 else:
                     filtered_tasks = all_tasks
-                
+
                 # Convert to serializable format
                 response = {
                     "total_tasks": len(filtered_tasks),
@@ -724,7 +724,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                     "tasks": [task_info.to_dict() for task_info in filtered_tasks.values()],
                     "timestamp": datetime.now().isoformat()
                 }
-                
+
                 return [types.TextContent(type="text", text=json.dumps(response, indent=2))]
             except Exception as e:
                 logger.error(f"Error in list_tasks: {str(e)}")
@@ -737,7 +737,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
 
         elif name == "get_available_models":
             try:
-                models = await cme.llm_provider.get_available_models()
+                models = await cme.get_available_models()
                 response_text = json.dumps(models, indent=2)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
@@ -751,7 +751,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
 
         elif name == "get_current_model":
             try:
-                model = cme.llm_provider.get_current_model()
+                model = cme.get_current_model()
                 response_text = json.dumps({"current_model": model}, indent=2)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
@@ -880,7 +880,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
         elif name == "set_model":
             model_name = arguments["model_name"]
             try:
-                cme.llm_provider.set_model(model_name)
+                cme.set_model(model_name)
                 response_text = json.dumps({"status": "success", "current_model": model_name}, indent=2)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:

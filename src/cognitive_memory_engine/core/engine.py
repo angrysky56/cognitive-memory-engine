@@ -204,6 +204,24 @@ class CognitiveMemoryEngine:
             logger.error(f"Failed to initialize Cognitive Memory Engine: {e}")
             raise CMEInitializationError(f"Initialization failed: {e}") from e
 
+    @property
+    def llm_provider(self):
+        """Get the LLM provider from the narrative builder."""
+        if self.narrative_builder and self.narrative_builder.provider:
+            return self.narrative_builder.provider
+        elif self.response_generator and self.response_generator.provider:
+            return self.response_generator.provider
+        else:
+            raise CMEError("No LLM provider available. Engine may not be properly initialized.")
+
+    def get_current_model(self) -> str:
+        """Get the currently selected model."""
+        return self.llm_provider.get_current_model()
+
+    async def get_available_models(self) -> list[str]:
+        """Get available models from the provider."""
+        return await self.llm_provider.get_available_models()
+
     def set_model(self, model_name: str) -> None:
         """
         Sets the active LLM model for all components.
@@ -416,7 +434,7 @@ class CognitiveMemoryEngine:
     async def link_conversation_to_knowledge(
         self,
         conversation_id: str,
-        document_concept_id: str = None
+        document_concept_id: str | None = None
     ) -> list[dict[str, Any]]:
         """
         Create cross-references between conversation and document knowledge.
