@@ -113,7 +113,7 @@ The Cognitive Memory Engine implements a revolutionary dual-track approach to AI
 
 ## 🛠 Available MCP Tools
 
-### **Conversation Management**
+### **Track 1: Conversation Management**
 ```python
 # Store a conversation with full cognitive analysis
 store_conversation({
@@ -123,9 +123,17 @@ store_conversation({
   ],
   "context": {"topic": "AI_frameworks", "importance": 0.9}
 })
+
+# Query conversation memory with temporal scope
+query_memory({
+  "query": "What did we discuss about AI last week?",
+  "context_depth": 3,
+  "time_scope": "week",
+  "max_results": 10
+})
 ```
 
-### **Document Knowledge Storage**
+### **Track 2: Document Knowledge Management**
 ```python
 # Store formal documents as structured knowledge
 store_document_knowledge({
@@ -134,28 +142,7 @@ store_document_knowledge({
   "domain": "ai_architecture",
   "metadata": {"source": "research_paper", "version": "1.0"}
 })
-```
 
-### **Unified Memory Queries**
-```python
-# Query both tracks simultaneously
-query_memory({
-  "query": "What is SPL in SAPE?",
-  "context_depth": 3,
-  "time_scope": "week",
-  "max_results": 10
-})
-
-# Blended knowledge retrieval
-query_blended_knowledge({
-  "query": "Explain the relationship between SPL and PKG",
-  "include_formal": true,
-  "include_conversational": true
-})
-```
-
-### **Direct Concept Access**
-```python
 # Direct concept retrieval from document knowledge
 get_concept({"concept_name": "SPL"})
 
@@ -163,22 +150,41 @@ get_concept({"concept_name": "SPL"})
 browse_knowledge_shelf({"domain": "ai_architecture"})
 ```
 
-### **Cross-Reference Analysis**
+### **Track 3: Blended Integration**
 ```python
-# Link conversation mentions to formal concepts
+# Query both tracks simultaneously with cross-referencing
+query_blended_knowledge({
+  "query": "Explain the relationship between SPL and PKG",
+  "include_formal": true,
+  "include_conversational": true
+})
+
+# Create cross-references between conversation mentions and formal concepts
 link_conversation_to_knowledge({
   "conversation_id": "uuid",
   "document_concept_id": "optional_specific_concept"
 })
 ```
 
-### **System Analysis**
+### **System Analysis & Management**
 ```python
 # Deep conversation analysis
 analyze_conversation({"analysis_type": "all"})
 
 # Memory system statistics
 get_memory_stats({"include_details": true})
+
+# RTM tree details
+get_rtm_tree_details({"tree_id": "uuid"})
+
+# Background task management
+list_tasks({"status_filter": "all"})
+get_task_status({"task_id": "uuid"})
+
+# Model management
+get_available_models({})
+get_current_model({})
+set_model({"model_name": "gemini-2.0-flash-001"})
 ```
 
 ## 📊 Available MCP Resources

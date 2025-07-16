@@ -359,6 +359,109 @@ async def handle_list_tools() -> list[types.Tool]:
             },
         ),
         types.Tool(
+            name="store_document_knowledge",
+            description="Store formal documents as structured knowledge",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "document_content": {
+                        "type": "string",
+                        "description": "The document content to store"
+                    },
+                    "root_concept": {
+                        "type": "string", 
+                        "description": "Main concept of the document"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "description": "Knowledge domain",
+                        "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "description": "Optional metadata for the document",
+                        "properties": {
+                            "source": {"type": "string"},
+                            "version": {"type": "string"},
+                            "authors": {"type": "array", "items": {"type": "string"}}
+                        }
+                    }
+                },
+                "required": ["document_content", "root_concept", "domain"]
+            },
+        ),
+        types.Tool(
+            name="get_concept",
+            description="Retrieve specific concept from document knowledge",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "concept_name": {
+                        "type": "string",
+                        "description": "Name of concept to retrieve"
+                    }
+                },
+                "required": ["concept_name"]
+            },
+        ),
+        types.Tool(
+            name="browse_knowledge_shelf", 
+            description="Browse concepts in a knowledge domain",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": "Knowledge domain to browse",
+                        "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]
+                    }
+                },
+                "required": ["domain"]
+            },
+        ),
+        types.Tool(
+            name="query_blended_knowledge",
+            description="Query both conversation and document knowledge simultaneously",
+            inputSchema={
+                "type": "object", 
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Natural language query"
+                    },
+                    "include_formal": {
+                        "type": "boolean",
+                        "description": "Include formal document knowledge",
+                        "default": True
+                    },
+                    "include_conversational": {
+                        "type": "boolean", 
+                        "description": "Include conversation insights",
+                        "default": True
+                    }
+                },
+                "required": ["query"]
+            },
+        ),
+        types.Tool(
+            name="link_conversation_to_knowledge",
+            description="Create cross-references between conversation and document knowledge",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "conversation_id": {
+                        "type": "string",
+                        "description": "ID of conversation to analyze for concept mentions"
+                    },
+                    "document_concept_id": {
+                        "type": "string",
+                        "description": "Optional specific concept to link to"
+                    }
+                },
+                "required": ["conversation_id"]
+            },
+        ),
+        types.Tool(
             name="get_available_models",
             description="Get a list of available models from the provider.",
             inputSchema={
@@ -628,6 +731,120 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 error_response = {
                     "status": "error",
                     "error": f"Failed to get current model: {str(e)}",
+                    "timestamp": datetime.now().isoformat()
+                }
+                return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
+
+        elif name == "store_document_knowledge":
+            document_content = arguments["document_content"]
+            root_concept = arguments["root_concept"]
+            domain = arguments["domain"]
+            metadata = arguments.get("metadata", {})
+
+            try:
+                result = await cme.store_document_knowledge(
+                    document_content=document_content,
+                    root_concept=root_concept,
+                    domain=domain,
+                    metadata=metadata
+                )
+                response_text = json.dumps(result, indent=2, default=str)
+                return [types.TextContent(type="text", text=response_text)]
+            except Exception as e:
+                logger.error(f"Error in store_document_knowledge: {str(e)}")
+                error_response = {
+                    "status": "error",
+                    "error": f"Failed to store document knowledge: {str(e)}",
+                    "timestamp": datetime.now().isoformat()
+                }
+                return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
+
+        elif name == "get_concept":
+            concept_name = arguments["concept_name"]
+
+            try:
+                concept = await cme.get_concept(concept_name)
+                if concept:
+                    response_text = json.dumps(concept, indent=2, default=str)
+                else:
+                    response = {
+                        "status": "not_found",
+                        "concept_name": concept_name,
+                        "message": f"Concept '{concept_name}' not found in document knowledge",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    response_text = json.dumps(response, indent=2)
+                return [types.TextContent(type="text", text=response_text)]
+            except Exception as e:
+                logger.error(f"Error in get_concept: {str(e)}")
+                error_response = {
+                    "status": "error",
+                    "error": f"Failed to retrieve concept: {str(e)}",
+                    "timestamp": datetime.now().isoformat()
+                }
+                return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
+
+        elif name == "browse_knowledge_shelf":
+            domain = arguments["domain"]
+
+            try:
+                shelf_data = await cme.browse_knowledge_shelf(domain)
+                response_text = json.dumps(shelf_data, indent=2, default=str)
+                return [types.TextContent(type="text", text=response_text)]
+            except Exception as e:
+                logger.error(f"Error in browse_knowledge_shelf: {str(e)}")
+                error_response = {
+                    "status": "error",
+                    "error": f"Failed to browse knowledge shelf: {str(e)}",
+                    "timestamp": datetime.now().isoformat()
+                }
+                return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
+
+        elif name == "query_blended_knowledge":
+            query = arguments["query"]
+            include_formal = arguments.get("include_formal", True)
+            include_conversational = arguments.get("include_conversational", True)
+
+            try:
+                result = await cme.query_blended_knowledge(
+                    query=query,
+                    include_formal=include_formal,
+                    include_conversational=include_conversational
+                )
+                response_text = json.dumps(result, indent=2, default=str)
+                return [types.TextContent(type="text", text=response_text)]
+            except Exception as e:
+                logger.error(f"Error in query_blended_knowledge: {str(e)}")
+                error_response = {
+                    "status": "error",
+                    "error": f"Failed to query blended knowledge: {str(e)}",
+                    "timestamp": datetime.now().isoformat()
+                }
+                return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
+
+        elif name == "link_conversation_to_knowledge":
+            conversation_id = arguments["conversation_id"]
+            document_concept_id = arguments.get("document_concept_id")
+
+            try:
+                links = await cme.link_conversation_to_knowledge(
+                    conversation_id=conversation_id,
+                    document_concept_id=document_concept_id
+                )
+                response = {
+                    "status": "success",
+                    "conversation_id": conversation_id,
+                    "links_created": len(links),
+                    "links": links,
+                    "timestamp": datetime.now().isoformat()
+                }
+                response_text = json.dumps(response, indent=2, default=str)
+                return [types.TextContent(type="text", text=response_text)]
+            except Exception as e:
+                logger.error(f"Error in link_conversation_to_knowledge: {str(e)}")
+                error_response = {
+                    "status": "error",
+                    "error": f"Failed to link conversation to knowledge: {str(e)}",
                     "timestamp": datetime.now().isoformat()
                 }
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
