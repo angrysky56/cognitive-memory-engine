@@ -1,0 +1,40 @@
+# Core dependencies
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+
+# AI and ML
+openai>=1.3.0  # For API compatibility, even though we use local models
+google-genai>=0.8.0  # Google Gemini API (unified SDK)
+anthropic>=0.3.0  # Claude API
+sentence-transformers>=2.2.2
+torch>=2.1.0
+transformers>=4.35.0
+
+# Vector and Graph databases
+chromadb>=0.4.18
+networkx>=3.2.1
+
+# Data processing
+numpy>=1.24.0
+pandas>=2.1.0
+python-dateutil>=2.8.2
+
+# HTTP and async
+aiohttp>=3.9.0
+httpx>=0.25.0
+
+# Development
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.7.0
+
+# Logging and monitoring
+loguru>=0.7.0
+prometheus-client>=0.19.0
+
+# Optional: For Ollama integration
+ollama>=0.1.0
