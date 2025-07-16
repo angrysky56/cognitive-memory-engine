@@ -62,6 +62,22 @@ async def initialize_engine() -> CognitiveMemoryEngine:
     return engine
 
 
+async def async_cleanup():
+    """Async cleanup function."""
+    global engine
+
+    logger.info("Cleaning up Cognitive Memory Engine")
+
+    if engine:
+        try:
+            await engine.cleanup()
+            logger.info("Engine cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during engine cleanup: {e}")
+        finally:
+            engine = None
+
+
 def cleanup():
     """Clean up resources on shutdown."""
     global engine
@@ -70,8 +86,20 @@ def cleanup():
 
     if engine:
         try:
-            asyncio.create_task(engine.cleanup())
-            logger.info("Engine cleanup completed")
+            # Try to run cleanup in current event loop if available
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're in an event loop, create a task
+                task = loop.create_task(async_cleanup())
+                # Don't await here as this might be called from signal handler
+                logger.info("Cleanup task created")
+            except RuntimeError:
+                # No event loop running, try to create one
+                try:
+                    asyncio.run(async_cleanup())
+                    logger.info("Engine cleanup completed")
+                except Exception as e:
+                    logger.error(f"Error running async cleanup: {e}")
         except Exception as e:
             logger.error(f"Error during engine cleanup: {e}")
         finally:
@@ -906,7 +934,8 @@ async def main() -> int:
         logger.error(f"Server error: {e}")
         exit_code = 1
     finally:
-        cleanup()
+        # Proper async cleanup
+        await async_cleanup()
     return exit_code
 
 
