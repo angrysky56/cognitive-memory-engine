@@ -4,14 +4,13 @@ Cognitive Memory Engine Exceptions
 Custom exception classes for the CME system.
 """
 
-
 class CMEError(Exception):
     """Base exception class for Cognitive Memory Engine errors."""
 
-    def __init__(self, message: str, error_code: str = None):
+    def __init__(self, message: str, error_code: str | None = None):
         """
         Initialize CME error.
-        
+
         Args:
             message: Error message
             error_code: Optional error code for programmatic handling

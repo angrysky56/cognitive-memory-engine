@@ -180,7 +180,7 @@ class ContextAssembler:
 
                 for tree_id in list(tree_ids)[:3]:  # Limit to 3 trees for performance
                     try:
-                        tree_data = await self.rtm_store.get_tree(tree_id)
+                        tree_data = await self.rtm_store.load_tree(tree_id)
                         if tree_data:
                             # Get nodes at optimal depth for context
                             context_nodes = tree_data.traverse_to_depth(max_depth)

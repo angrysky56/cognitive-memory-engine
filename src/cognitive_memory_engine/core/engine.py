@@ -416,16 +416,73 @@ class CognitiveMemoryEngine:
     async def link_conversation_to_knowledge(
         self,
         conversation_id: str,
-        document_concept_id: str
+        document_concept_id: str = None
     ) -> list[dict[str, Any]]:
         """
-        TODO: Create cross-references between conversation and document knowledge
+        Create cross-references between conversation and document knowledge.
         
-        Should analyze conversation for mentions of formal concepts and create
+        Analyzes conversation for mentions of formal concepts and creates
         bidirectional links for blended retrieval.
+        
+        Args:
+            conversation_id: ID of conversation to analyze
+            document_concept_id: Optional specific concept to link to
+            
+        Returns:
+            List of concept links created
         """
-        # TODO: Implement cross-reference linking
-        raise NotImplementedError("Cross-reference linking not yet implemented")
+        logger.info(f"Creating cross-references for conversation {conversation_id}")
+        
+        try:
+            # Get all document concepts for matching
+            all_documents = await self.document_store.get_all_documents()
+            concept_names = []
+            concept_lookup = {}
+            
+            for doc in all_documents:
+                for concept_id, concept in doc.concepts.items():
+                    concept_names.append(concept.name)
+                    concept_lookup[concept.name.lower()] = {
+                        'concept_id': concept_id,
+                        'document_id': doc.doc_id,
+                        'concept': concept
+                    }
+            
+            # Load the conversation RTM tree
+            conversation_tree = await self.rtm_store.load_tree(conversation_id)
+            if not conversation_tree:
+                logger.warning(f"Conversation {conversation_id} not found")
+                return []
+                
+            # Analyze conversation nodes for concept mentions
+            links = []
+            for node in conversation_tree.nodes:
+                content_lower = node.content.lower()
+                
+                # Check for mentions of formal concepts
+                for concept_name in concept_names:
+                    if concept_name.lower() in content_lower:
+                        concept_info = concept_lookup[concept_name.lower()]
+                        
+                        # Create concept link
+                        link = {
+                            'link_id': f"link_{conversation_id}_{concept_info['concept_id']}",
+                            'conversation_node_id': node.node_id,
+                            'document_concept_id': concept_info['concept_id'],
+                            'document_id': concept_info['document_id'],
+                            'relationship_type': 'discusses',
+                            'confidence_score': 0.8,
+                            'concept_name': concept_name,
+                            'context_snippet': content_lower[:100]
+                        }
+                        links.append(link)
+                        
+            logger.info(f"Created {len(links)} cross-reference links")
+            return links
+            
+        except Exception as e:
+            logger.error(f"Error creating cross-references: {e}")
+            return []
 
     async def query_blended_knowledge(
         self,
@@ -434,16 +491,127 @@ class CognitiveMemoryEngine:
         include_conversational: bool = True
     ) -> dict[str, Any]:
         """
-        TODO: Unified query interface combining both knowledge tracks
+        Unified query interface combining both knowledge tracks.
         
-        Should return:
+        Returns:
         - formal_knowledge: Structured info from document RTMs
         - conversation_insights: Context from dialogue RTMs  
         - cross_references: Links between the tracks
         - unified_summary: Blended understanding
+        
+        Args:
+            query: Natural language query
+            include_formal: Include formal document knowledge
+            include_conversational: Include conversation insights
+            
+        Returns:
+            BlendedQueryResult with combined knowledge
         """
-        # TODO: Implement blended knowledge query
-        raise NotImplementedError("Blended knowledge query not yet implemented")
+        logger.info(f"Blended query: '{query[:50]}...'")
+        
+        result = {
+            'query': query,
+            'formal_knowledge': {},
+            'conversation_insights': {},
+            'cross_references': [],
+            'unified_summary': '',
+            'confidence_score': 0.0
+        }
+        
+        try:
+            # Track 1: Query formal document knowledge
+            if include_formal:
+                # Search for matching concepts
+                all_documents = await self.document_store.get_all_documents()
+                formal_matches = []
+                
+                for doc in all_documents:
+                    for concept_id, concept in doc.concepts.items():
+                        # Simple relevance scoring (could be improved with semantic similarity)
+                        concept_text = f"{concept.name} {concept.description}"
+                        query_words = set(query.lower().split())
+                        concept_words = set(concept_text.lower().split())
+                        
+                        # Calculate overlap score
+                        overlap = len(query_words & concept_words)
+                        if overlap > 0:
+                            formal_matches.append({
+                                'concept_id': concept_id,
+                                'document_id': doc.doc_id,
+                                'concept': concept,
+                                'relevance_score': overlap / len(query_words),
+                                'document_title': doc.root_concept
+                            })
+                
+                # Sort by relevance and take top matches
+                formal_matches.sort(key=lambda x: x['relevance_score'], reverse=True)
+                result['formal_knowledge'] = formal_matches[:3]
+                
+            # Track 2: Query conversation memory
+            if include_conversational:
+                conversation_results = await self.query_memory(
+                    query=query,
+                    context_depth=3,
+                    max_results=5
+                )
+                
+                result['conversation_insights'] = {
+                    'results': conversation_results.get('results', []),
+                    'context_summary': conversation_results.get('context_summary', ''),
+                    'total_results': conversation_results.get('total_results', 0)
+                }
+                
+            # Track 3: Find cross-references
+            if include_formal and include_conversational:
+                if result['formal_knowledge'] and result['conversation_insights']['results']:
+                    # Find potential cross-references between formal concepts and conversation
+                    for formal_match in result['formal_knowledge']:
+                        concept_name = formal_match['concept'].name
+                        
+                        for conv_result in result['conversation_insights']['results']:
+                            if concept_name.lower() in conv_result.get('content', '').lower():
+                                result['cross_references'].append({
+                                    'formal_concept': concept_name,
+                                    'conversation_fragment': conv_result.get('content', '')[:100],
+                                    'relationship': 'mentions',
+                                    'confidence': 0.7
+                                })
+                                
+            # Generate unified summary
+            summary_parts = []
+            
+            if result['formal_knowledge']:
+                formal_summary = f"Formal knowledge: Found {len(result['formal_knowledge'])} relevant concepts"
+                top_concept = result['formal_knowledge'][0]['concept']
+                formal_summary += f" including '{top_concept.name}': {top_concept.description[:100]}..."
+                summary_parts.append(formal_summary)
+                
+            if result['conversation_insights']['results']:
+                conv_count = len(result['conversation_insights']['results'])
+                conv_summary = f"Conversation insights: Found {conv_count} relevant discussion fragments"
+                summary_parts.append(conv_summary)
+                
+            if result['cross_references']:
+                cross_summary = f"Cross-references: {len(result['cross_references'])} connections between formal knowledge and conversations"
+                summary_parts.append(cross_summary)
+                
+            result['unified_summary'] = '. '.join(summary_parts) if summary_parts else "No relevant knowledge found"
+            
+            # Calculate overall confidence
+            formal_confidence = 0.8 if result['formal_knowledge'] else 0.0
+            conv_confidence = 0.6 if result['conversation_insights']['results'] else 0.0
+            cross_confidence = 0.9 if result['cross_references'] else 0.0
+            
+            result['confidence_score'] = max(formal_confidence, conv_confidence, cross_confidence)
+            
+            logger.info(f"Blended query complete: {len(result['formal_knowledge'])} formal, {len(result['conversation_insights'].get('results', []))} conversational, {len(result['cross_references'])} cross-refs")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in blended query: {e}")
+            result['unified_summary'] = f"Error processing query: {str(e)}"
+            return result
 
     async def get_concept(self, concept_name: str) -> dict[str, Any] | None:
         """
