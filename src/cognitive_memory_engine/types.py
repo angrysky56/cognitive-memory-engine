@@ -5,6 +5,7 @@ Defines the fundamental types used across all modules, inspired by:
 - Random Tree Model (RTM) for narrative hierarchies
 - Temporal organization for time-based memory
 - Neural gain mechanism for salience weighting
+- Dual-track architecture for conversation + document knowledge
 """
 
 import uuid
@@ -22,6 +23,31 @@ class TemporalScale(Enum):
     WEEK = "week"
     MONTH = "month"
     YEAR = "year"
+
+
+class KnowledgeDomain(Enum):
+    """Knowledge domains for document organization"""
+    AI_ARCHITECTURE = "ai_architecture"
+    PROMPT_ENGINEERING = "prompt_engineering"
+    NEURAL_NETWORKS = "neural_networks"
+    COGNITIVE_SCIENCE = "cognitive_science"
+    SOFTWARE_ENGINEERING = "software_engineering"
+    RESEARCH_METHODS = "research_methods"
+    MACHINE_LEARNING = "machine_learning"
+    NATURAL_LANGUAGE_PROCESSING = "natural_language_processing"
+    GENERAL_KNOWLEDGE = "general_knowledge"
+
+
+class LinkRelationship(Enum):
+    """Types of relationships between conversation and document knowledge"""
+    DISCUSSES = "discusses"
+    QUESTIONS = "questions"
+    ELABORATES = "elaborates"
+    CONTRADICTS = "contradicts"
+    REFERENCES = "references"
+    IMPLEMENTS = "implements"
+    CRITICIZES = "criticizes"
+    SUMMARIZES = "summarizes"
 
 
 class NodeType(Enum):
@@ -297,3 +323,133 @@ class SystemConfig:
     auto_archive_days: int
     vector_manager: str = "chroma"
     svg_config: dict[str, Any] = field(default_factory=dict)
+
+
+# =============================================================================
+# DUAL-TRACK ARCHITECTURE DATA STRUCTURES
+# =============================================================================
+
+@dataclass
+class KnowledgeConcept:
+    """Individual concept node within a document knowledge structure"""
+    concept_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = ""
+    description: str = ""
+    
+    # Hierarchical structure within document
+    parent_concept_id: str | None = None
+    child_concept_ids: list[str] = field(default_factory=list)
+    
+    # Content and knowledge
+    content: str = ""
+    structured_data: dict[str, Any] = field(default_factory=dict)
+    examples: list[str] = field(default_factory=list)
+    
+    # Embeddings and search
+    base_embedding: list[float] | None = None
+    salience_score: float = 1.0
+    
+    # Relationships
+    related_concept_ids: list[str] = field(default_factory=list)
+    
+    # Metadata
+    domain: KnowledgeDomain = KnowledgeDomain.GENERAL_KNOWLEDGE
+    tags: list[str] = field(default_factory=list)
+    confidence_score: float = 0.8
+    created: datetime = field(default_factory=datetime.now)
+    last_updated: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class DocumentRTM:
+    """Formal document knowledge structure with RTM organization"""
+    doc_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    title: str = ""
+    root_concept: str = ""
+    domain: KnowledgeDomain = KnowledgeDomain.GENERAL_KNOWLEDGE
+    
+    # Hierarchical knowledge structure (RTM for documents)
+    root_concept_id: str = ""
+    concepts: dict[str, KnowledgeConcept] = field(default_factory=dict)
+    
+    # Document metadata
+    source_content: str = ""
+    source_metadata: dict[str, Any] = field(default_factory=dict)
+    
+    # RTM properties
+    max_branching_factor: int = 4
+    max_depth: int = 6
+    total_concepts: int = 0
+    compression_ratio: float = 1.0
+    
+    # Temporal properties
+    created: datetime = field(default_factory=datetime.now)
+    last_accessed: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class ConceptLink:
+    """Cross-reference between conversation and document knowledge"""
+    link_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    
+    # Links conversation RTM nodes to document concepts
+    conversation_node_id: str = ""
+    conversation_tree_id: str = ""
+    document_concept_id: str = ""
+    document_id: str = ""
+    
+    # Relationship information
+    relationship_type: LinkRelationship = LinkRelationship.DISCUSSES
+    confidence_score: float = 0.5
+    context: str = ""  # Where/how the link was identified
+    
+    # Metadata
+    created: datetime = field(default_factory=datetime.now)
+    validated: bool = False
+
+
+@dataclass
+class KnowledgeShelf:
+    """Domain-based organization of document knowledge"""
+    shelf_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    domain: KnowledgeDomain = KnowledgeDomain.GENERAL_KNOWLEDGE
+    name: str = ""
+    description: str = ""
+    
+    # Organization
+    document_ids: list[str] = field(default_factory=list)
+    featured_concepts: list[str] = field(default_factory=list)
+    subcategories: dict[str, list[str]] = field(default_factory=dict)
+    
+    # Metadata
+    tags: list[str] = field(default_factory=list)
+    created: datetime = field(default_factory=datetime.now)
+    last_accessed: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class BlendedQueryResult:
+    """Unified response combining conversation and document knowledge"""
+    query: str = ""
+    
+    # Formal knowledge from documents
+    formal_knowledge: dict[str, Any] = field(default_factory=dict)
+    
+    # Conversational insights from dialogue RTMs
+    conversation_insights: dict[str, Any] = field(default_factory=dict)
+    
+    # Cross-references between tracks
+    cross_references: list[ConceptLink] = field(default_factory=list)
+    
+    # Unified synthesis
+    unified_summary: str = ""
+    confidence_score: float = 0.5
+    
+    # Query metadata
+    formal_sources_count: int = 0
+    conversation_sources_count: int = 0
+    total_cross_references: int = 0
+    
+    # Processing info
+    timestamp: datetime = field(default_factory=datetime.now)
+    processing_time_ms: int = 0

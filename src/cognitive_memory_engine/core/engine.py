@@ -3,6 +3,41 @@ Core Cognitive Memory Engine
 
 This module provides the main interface to the Cognitive Memory Engine,
 integrating all components into a unified system.
+
+TODO: DUAL-TRACK ARCHITECTURE IMPLEMENTATION
+===========================================
+
+CURRENT STATE: Only implements Track 1 (Conversation Memory)
+- ✓ store_conversation() works correctly for dialogue narratives
+- ✓ Temporal organization by session/day
+- ✓ RTM trees for conversation compression
+
+MISSING IMPLEMENTATION:
+----------------------
+
+Track 2: Document Knowledge Storage
+- TODO: Add store_document_knowledge(content, root_concept, domain) 
+- TODO: Create DocumentRTM with formal knowledge hierarchies
+- TODO: Build structured concept nodes (not conversation nodes)
+- TODO: Root node approach: "SAPE" -> SPL, PKG, SEE, CML, Reflective Controller
+
+Track 3: Blended Integration Layer  
+- TODO: Add ConceptLink cross-references between tracks
+- TODO: Implement link_conversation_to_knowledge()
+- TODO: Create unified query interface combining both tracks
+- TODO: Cross-reference conversation mentions to formal concepts
+
+Storage Architecture Changes:
+- TODO: Add knowledge_shelves/ directory for domain organization
+- TODO: Create concept-based indexing (not just temporal)
+- TODO: Separate vector stores for conversation vs document knowledge
+
+Query Interface Enhancement:
+- TODO: query_blended_knowledge() returning formal + conversational insights
+- TODO: Topic-specific retrieval: get_concept("SAPE") 
+- TODO: Domain browsing: browse_shelf(AI_ARCHITECTURE)
+
+PRIORITY: Implement Document Knowledge Track first, then Integration Layer
 """
 
 import logging
@@ -12,11 +47,14 @@ from typing import Any
 
 from ..comprehension.narrative_tree_builder import NarrativeTreeBuilder
 from ..comprehension.temporal_organizer import TemporalOrganizer
+from ..comprehension.document_knowledge_builder import DocumentKnowledgeBuilder
 from ..production.response_generator import ResponseGenerator
 from ..storage.rtm_graphs import RTMGraphStore
 from ..storage.temporal_library import TemporalLibrary
 from ..storage.vector_store import VectorStore
-from ..types import ConversationTurn, SystemConfig, TemporalScale
+from ..storage.document_store import DocumentStore
+from ..types import (ConversationTurn, SystemConfig, TemporalScale, 
+                    KnowledgeDomain, DocumentRTM, BlendedQueryResult)
 from ..workspace.context_assembler import ContextAssembler
 from ..workspace.vector_manager import VectorManager
 from ..workspace.svg_vector_manager import SVGVectorManager
@@ -56,6 +94,10 @@ class CognitiveMemoryEngine:
         self.vector_store: VectorStore | None = None
         self.temporal_library: TemporalLibrary | None = None
         self.rtm_store: RTMGraphStore | None = None
+        
+        # Dual-track architecture components (Track 2 & 3)
+        self.document_store: DocumentStore | None = None
+        self.document_builder: DocumentKnowledgeBuilder | None = None
 
         # Session tracking
         self.active_sessions: dict[str, datetime] = {}
@@ -88,11 +130,21 @@ class CognitiveMemoryEngine:
 
             self.rtm_store = RTMGraphStore(str(data_dir / "rtm_graphs"))
 
-            # Initialize comprehension components
-            logger.info("Initializing comprehension module...")
+            # Initialize dual-track architecture components (Track 2)
+            logger.info("Initializing document knowledge system...")
+            
+            self.document_store = DocumentStore(str(data_dir / "document_knowledge"))
             
             # Get cloud provider configuration
             cloud_config = get_cloud_provider_config()
+            
+            self.document_builder = DocumentKnowledgeBuilder(
+                cloud_config=cloud_config,
+                document_store=self.document_store
+            )
+
+            # Initialize comprehension components
+            logger.info("Initializing comprehension module...")
 
             self.narrative_builder = NarrativeTreeBuilder(
                 cloud_config=cloud_config,
@@ -272,6 +324,295 @@ class CognitiveMemoryEngine:
         except Exception as e:
             logger.error(f"Error storing conversation: {e}")
             raise CMEError(f"Failed to store conversation: {e}") from e
+
+    # TODO: IMPLEMENT DUAL-TRACK ARCHITECTURE METHODS
+    # ================================================
+
+    async def store_document_knowledge(
+        self,
+        document_content: str,
+        root_concept: str,
+        domain: str,
+        metadata: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """
+        Store formal document as structured knowledge RTM.
+        
+        This creates:
+        - Root node for main concept (e.g., "SAPE")
+        - Hierarchical breakdown of document structure
+        - Concept nodes for each major component
+        - Cross-linkable knowledge graph (not conversation narrative)
+        
+        Args:
+            document_content: Raw document text
+            root_concept: Main concept name (e.g., "SAPE")
+            domain: Knowledge domain string (converted to enum)
+            metadata: Optional source metadata
+            
+        Returns:
+            Storage results with document ID and analysis
+        """
+        if not self.initialized:
+            await self.initialize()
+        
+        try:
+            # Convert domain string to enum
+            try:
+                domain_enum = KnowledgeDomain(domain.lower())
+            except ValueError:
+                logger.warning(f"Unknown domain '{domain}', using GENERAL_KNOWLEDGE")
+                domain_enum = KnowledgeDomain.GENERAL_KNOWLEDGE
+            
+            logger.info(f"Storing document knowledge for '{root_concept}' in domain {domain_enum.value}")
+            
+            # Use document builder to create and store DocumentRTM
+            document_id = await self.document_builder.store_document_knowledge(
+                document_content=document_content,
+                root_concept=root_concept,
+                domain=domain_enum,
+                metadata=metadata
+            )
+            
+            # Get the stored document for analysis
+            document = await self.document_store.get_document(document_id)
+            
+            if not document:
+                raise CMEError("Document was stored but could not be retrieved")
+            
+            # Create result summary
+            result = {
+                "document_id": document_id,
+                "root_concept": root_concept,
+                "domain": domain_enum.value,
+                "storage_type": "formal_knowledge",
+                "timestamp": datetime.now().isoformat(),
+                "document_analysis": {
+                    "total_concepts": document.total_concepts,
+                    "compression_ratio": document.compression_ratio,
+                    "max_depth": document.max_depth,
+                    "root_concept_id": document.root_concept_id
+                },
+                "concept_hierarchy": {
+                    concept_id: {
+                        "name": concept.name,
+                        "description": concept.description,
+                        "children_count": len(concept.child_concept_ids),
+                        "salience_score": concept.salience_score
+                    }
+                    for concept_id, concept in document.concepts.items()
+                },
+                "metadata": document.source_metadata,
+                "status": "success"
+            }
+            
+            logger.info(f"Successfully stored document knowledge '{root_concept}' with {document.total_concepts} concepts")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to store document knowledge for '{root_concept}': {e}")
+            raise CMEError(f"Document knowledge storage failed: {e}") from e
+
+    async def link_conversation_to_knowledge(
+        self,
+        conversation_id: str,
+        document_concept_id: str
+    ) -> list[dict[str, Any]]:
+        """
+        TODO: Create cross-references between conversation and document knowledge
+        
+        Should analyze conversation for mentions of formal concepts and create
+        bidirectional links for blended retrieval.
+        """
+        # TODO: Implement cross-reference linking
+        raise NotImplementedError("Cross-reference linking not yet implemented")
+
+    async def query_blended_knowledge(
+        self,
+        query: str,
+        include_formal: bool = True,
+        include_conversational: bool = True
+    ) -> dict[str, Any]:
+        """
+        TODO: Unified query interface combining both knowledge tracks
+        
+        Should return:
+        - formal_knowledge: Structured info from document RTMs
+        - conversation_insights: Context from dialogue RTMs  
+        - cross_references: Links between the tracks
+        - unified_summary: Blended understanding
+        """
+        # TODO: Implement blended knowledge query
+        raise NotImplementedError("Blended knowledge query not yet implemented")
+
+    async def get_concept(self, concept_name: str) -> dict[str, Any] | None:
+        """
+        Direct concept retrieval from document knowledge.
+        
+        Returns structured knowledge about specific concept,
+        not conversation fragments.
+        
+        Args:
+            concept_name: Name of concept to retrieve
+            
+        Returns:
+            Concept information dict or None if not found
+        """
+        if not self.initialized:
+            await self.initialize()
+        
+        try:
+            # Search for concept in document store
+            document, concept = await self.document_store.get_concept_by_name(concept_name)
+            
+            if not document or not concept:
+                logger.info(f"Concept '{concept_name}' not found in document knowledge")
+                return None
+            
+            # Update access time
+            document.last_accessed = datetime.now()
+            concept.last_updated = datetime.now()
+            
+            # Build concept information
+            concept_info = {
+                "concept_name": concept.name,
+                "concept_id": concept.concept_id,
+                "description": concept.description,
+                "content": concept.content,
+                "domain": concept.domain.value,
+                "document_context": {
+                    "document_id": document.doc_id,
+                    "document_title": document.title,
+                    "root_concept": document.root_concept
+                },
+                "hierarchy": {
+                    "parent_concept_id": concept.parent_concept_id,
+                    "child_concept_ids": concept.child_concept_ids,
+                    "related_concept_ids": concept.related_concept_ids
+                },
+                "structured_data": concept.structured_data,
+                "examples": concept.examples,
+                "metadata": {
+                    "salience_score": concept.salience_score,
+                    "confidence_score": concept.confidence_score,
+                    "tags": concept.tags,
+                    "created": concept.created.isoformat(),
+                    "last_updated": concept.last_updated.isoformat()
+                },
+                "source_type": "formal_knowledge",
+                "retrieved_at": datetime.now().isoformat()
+            }
+            
+            logger.info(f"Retrieved concept '{concept_name}' from document knowledge")
+            return concept_info
+            
+        except Exception as e:
+            logger.error(f"Failed to retrieve concept '{concept_name}': {e}")
+            raise CMEError(f"Concept retrieval failed: {e}") from e
+
+    async def browse_knowledge_shelf(self, domain: str) -> dict[str, Any]:
+        """
+        Browse all concepts in a knowledge domain.
+        
+        Returns organized view of all concepts in domain like
+        AI_ARCHITECTURE, PROMPT_ENGINEERING, etc.
+        
+        Args:
+            domain: Knowledge domain to browse
+            
+        Returns:
+            Knowledge shelf information with documents and concepts
+        """
+        if not self.initialized:
+            await self.initialize()
+        
+        try:
+            # Convert domain string to enum
+            try:
+                domain_enum = KnowledgeDomain(domain.lower())
+            except ValueError:
+                logger.warning(f"Unknown domain '{domain}', listing available domains")
+                return {
+                    "error": f"Unknown domain '{domain}'",
+                    "available_domains": [d.value for d in KnowledgeDomain],
+                    "suggestion": "Use one of the available domains listed above"
+                }
+            
+            logger.info(f"Browsing knowledge shelf for domain {domain_enum.value}")
+            
+            # Get knowledge shelf
+            shelf = await self.document_store.get_shelf(domain_enum)
+            
+            # Get all documents in this domain
+            documents = await self.document_store.list_documents_by_domain(domain_enum)
+            
+            # Build shelf information
+            shelf_info = {
+                "domain": domain_enum.value,
+                "domain_name": domain_enum.value.replace('_', ' ').title(),
+                "total_documents": len(documents),
+                "documents": [],
+                "featured_concepts": [],
+                "browsed_at": datetime.now().isoformat()
+            }
+            
+            # Add shelf metadata if exists
+            if shelf:
+                shelf_info.update({
+                    "shelf_name": shelf.name,
+                    "description": shelf.description,
+                    "tags": shelf.tags,
+                    "subcategories": shelf.subcategories,
+                    "created": shelf.created.isoformat(),
+                    "last_accessed": shelf.last_accessed.isoformat()
+                })
+            
+            # Add document information
+            for document in documents:
+                doc_info = {
+                    "document_id": document.doc_id,
+                    "title": document.title,
+                    "root_concept": document.root_concept,
+                    "total_concepts": document.total_concepts,
+                    "created": document.created.isoformat(),
+                    "last_accessed": document.last_accessed.isoformat(),
+                    "concepts": []
+                }
+                
+                # Add top-level concepts (direct children of root)
+                if document.root_concept_id in document.concepts:
+                    root_concept = document.concepts[document.root_concept_id]
+                    for child_id in root_concept.child_concept_ids:
+                        if child_id in document.concepts:
+                            child_concept = document.concepts[child_id]
+                            concept_info = {
+                                "concept_id": child_concept.concept_id,
+                                "name": child_concept.name,
+                                "description": child_concept.description[:100] + "..." if len(child_concept.description) > 100 else child_concept.description,
+                                "children_count": len(child_concept.child_concept_ids),
+                                "salience_score": child_concept.salience_score
+                            }
+                            doc_info["concepts"].append(concept_info)
+                            
+                            # Add to featured concepts if high salience
+                            if child_concept.salience_score > 0.7:
+                                shelf_info["featured_concepts"].append({
+                                    "name": child_concept.name,
+                                    "document_title": document.title,
+                                    "salience_score": child_concept.salience_score
+                                })
+                
+                shelf_info["documents"].append(doc_info)
+            
+            # Sort featured concepts by salience
+            shelf_info["featured_concepts"].sort(key=lambda x: x["salience_score"], reverse=True)
+            
+            logger.info(f"Retrieved {len(documents)} documents from {domain_enum.value} shelf")
+            return shelf_info
+            
+        except Exception as e:
+            logger.error(f"Failed to browse knowledge shelf for domain '{domain}': {e}")
+            raise CMEError(f"Knowledge shelf browsing failed: {e}") from e
 
     async def query_memory(
         self,
@@ -617,6 +958,12 @@ class CognitiveMemoryEngine:
                 await self.temporal_library.cleanup()
             if self.rtm_store:
                 await self.rtm_store.close()
+            
+            # Cleanup dual-track components
+            if self.document_store:
+                # Document store doesn't have async cleanup, but we can clear caches
+                self.document_store.documents.clear()
+                self.document_store.shelves.clear()
 
             self.active_sessions.clear()
             self.initialized = False
