@@ -41,6 +41,10 @@ dependencies = [
   # Vector and Graph databases
   "chromadb>=1.0.15",
   "networkx>=3.5",
+  # Phase 3A: Semantic Enhancement Dependencies
+  "duckdb>=1.3.2",  # High-performance analytical database for graph queries
+  "typer>=0.16.0",  # Elegant CLI interface (elegance toolkit)
+  "rich>=14.0.0",   # Enhanced terminal UX (debugging toolkit)
   # Scientific computing (for SVG)
   "scipy>=1.11.0",
   "scikit-learn>=1.3.0",
@@ -48,6 +52,8 @@ dependencies = [
   "numpy>=2.3.1",
   "pandas>=2.3.1",
   "python-dateutil>=2.9.0.post0",
+  # Semantic Reasoning (Phase 3A: Prolog + Montague Architecture)
+  "pyswip>=0.3.3", # Python interface to SWI-Prolog for formal logic reasoning
   # HTTP and async
   "aiohttp>=3.12.14",
   "httpx>=0.27.0,<0.28",  # Constrained by mcp-server-fetch

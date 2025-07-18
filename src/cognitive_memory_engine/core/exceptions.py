@@ -35,6 +35,11 @@ class CMEVectorError(CMEError):
     pass
 
 
+class CMEGraphError(CMEError):
+    """Raised when semantic graph operations fail."""
+    pass
+
+
 class CMETemporalError(CMEError):
     """Raised when temporal operations fail."""
     pass

@@ -95,9 +95,13 @@ async def initialize_engine() -> CognitiveMemoryEngine:
             enhanced_tools_class = import_enhanced_tools()
             if enhanced_tools_class and enhanced_tools_available:
                 enhanced_tools = enhanced_tools_class(engine)
+
+                # Step 3: Connect MCP tools to enhanced tools if available
+                await _connect_mcp_tools_to_enhanced(enhanced_tools)
+
                 logger.info("Enhanced knowledge tools initialized successfully")
 
-                # Step 3: Attach the initialized tools back to the engine instance.
+                # Step 4: Attach the initialized tools back to the engine instance.
                 engine.enhanced_knowledge_tools = enhanced_tools
             else:
                 logger.warning("Enhanced tools not available, continuing without them.")
@@ -110,6 +114,42 @@ async def initialize_engine() -> CognitiveMemoryEngine:
             raise CMEError(f"Engine initialization failed: {e}") from e
 
     return engine
+
+
+async def _connect_mcp_tools_to_enhanced(enhanced_tools_instance):
+    """Connect available MCP tools to enhanced knowledge tools."""
+    try:
+        # Check for available MCP tools and connect them
+        # These would be the actual MCP tool handlers available in the server
+        available_tools = {
+            "web_search": None,  # Would connect to actual web_search tool
+            "web_fetch": None,   # Would connect to actual web_fetch tool
+            "mcp-server-firecrawl:firecrawl_search": None,
+            "mcp-server-firecrawl:firecrawl_scrape": None,
+        }
+
+        # For now, mark tools as potentially available
+        # In a full implementation, this would connect actual tool handlers
+        connected_count = 0
+        for tool_name, handler in available_tools.items():
+            if handler:  # If tool handler is available
+                enhanced_tools_instance.set_mcp_tool(tool_name, handler)
+                connected_count += 1
+
+        logger.info(f"Connected {connected_count} MCP tools to enhanced knowledge system")
+
+        # Set integration features based on available tools
+        if hasattr(enhanced_tools_instance, 'integration_features'):
+            enhanced_tools_instance.integration_features = {
+                "fetch_enabled": connected_count > 0,
+                "context_enhanced": True,  # Context enhancement is always available
+                "enhanced_tools_available": True
+            }
+
+    except Exception as e:
+        logger.warning(f"Failed to connect MCP tools to enhanced system: {e}")
+        # Continue without enhanced tools rather than failing
+        pass
 
 
 async def async_cleanup():
@@ -1230,7 +1270,7 @@ async def main() -> int:
             logger.error(f"Cleanup error: {cleanup_error}")
             if exit_code == 0:  # Only change exit code if no previous error
                 exit_code = 1
-    
+
     return exit_code
 
 

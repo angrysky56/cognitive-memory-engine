@@ -40,7 +40,7 @@ uv add -e .
 
 ### MCP Server Configuration
 
-Add this to your Claude Desktop with your own paths to any `mcp_config.json`:
+Add this to your Claude Desktop or client MCP server with your own paths to any `mcp_config.json`:
 
 ```json
 {
@@ -64,6 +64,12 @@ Add this to your Claude Desktop with your own paths to any `mcp_config.json`:
   }
 }
 ```
+
+### Suggested system prompt
+
+See:
+
+SYSTEM_USE_PROMPT.md
 
 ### Testing the Installation
 
@@ -193,7 +199,7 @@ set_model({"model_name": "gemini-2.0-flash-001"})
 - `cme://memory/documents` - Document knowledge organized by domain
 - `cme://memory/concepts` - Direct access to formal concepts
 - `cme://memory/cross_references` - Links between tracks
-- `cme://memory/temporal` - Time-organized memory books
+TODO:- `cme://memory/temporal` - Time-organized memory books
 - `cme://memory/context` - Active workspace context
 
 ## 🔧 Development

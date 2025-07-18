@@ -52,14 +52,14 @@ def check_ollama():
     except Exception as e:
         print(f"❌ Ollama not running or accessible: {e}")
         print("Install Ollama: curl -fsSL https://ollama.com/install.sh | sh")
-        print("Then run: ollama pull qwen2.5:7b")
+        print("Then run: ollama pull qwen3")
         return False
 
 def create_config():
     """Create default configuration file"""
     config = {
         "data_directory": "./cme_data",
-        "ollama_model": "qwen2.5:7b",
+        "ollama_model": "qwen3",
         "embedding_model": "all-MiniLM-L6-v2",
         "rtm_config": {
             "max_branching_factor": 4,

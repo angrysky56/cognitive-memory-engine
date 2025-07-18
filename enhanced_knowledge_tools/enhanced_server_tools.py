@@ -28,6 +28,13 @@ class EnhancedKnowledgeServerTools:
             "Context7:resolve-library-id": None
         }
 
+        # Integration features status
+        self.integration_features = {
+            "fetch_enabled": False,
+            "context_enhanced": True,  # Context enhancement is always available
+            "enhanced_tools_available": True
+        }
+
     def set_mcp_tool(self, tool_name: str, tool_handler):
         """Set an MCP tool handler for use in knowledge ingestion."""
         if tool_name in self.mcp_tools:
