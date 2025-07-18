@@ -36,5 +36,9 @@ mypy>=1.7.0
 loguru>=0.7.0
 prometheus-client>=0.19.0
 
-# Optional: For Ollama integration
+# Optional:
+# For Ollama integration
 ollama>=0.1.0
+
+# fetch mcp
+mcp-server-fetch>=2025.4.7

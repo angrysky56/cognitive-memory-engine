@@ -2,6 +2,7 @@
 MCP Server module for Cognitive Memory Engine.
 """
 
-from .main import main
+# Don't import main directly to avoid module loading conflicts
+# when running with python -m
 
-__all__ = ["main"]
+__all__ = []

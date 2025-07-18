@@ -335,23 +335,23 @@ class KnowledgeConcept:
     concept_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
     description: str = ""
-    
+
     # Hierarchical structure within document
     parent_concept_id: str | None = None
     child_concept_ids: list[str] = field(default_factory=list)
-    
+
     # Content and knowledge
     content: str = ""
     structured_data: dict[str, Any] = field(default_factory=dict)
     examples: list[str] = field(default_factory=list)
-    
+
     # Embeddings and search
     base_embedding: list[float] | None = None
     salience_score: float = 1.0
-    
+
     # Relationships
     related_concept_ids: list[str] = field(default_factory=list)
-    
+
     # Metadata
     domain: KnowledgeDomain = KnowledgeDomain.GENERAL_KNOWLEDGE
     tags: list[str] = field(default_factory=list)
@@ -367,21 +367,21 @@ class DocumentRTM:
     title: str = ""
     root_concept: str = ""
     domain: KnowledgeDomain = KnowledgeDomain.GENERAL_KNOWLEDGE
-    
+
     # Hierarchical knowledge structure (RTM for documents)
     root_concept_id: str = ""
     concepts: dict[str, KnowledgeConcept] = field(default_factory=dict)
-    
+
     # Document metadata
     source_content: str = ""
     source_metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     # RTM properties
     max_branching_factor: int = 4
     max_depth: int = 6
     total_concepts: int = 0
     compression_ratio: float = 1.0
-    
+
     # Temporal properties
     created: datetime = field(default_factory=datetime.now)
     last_accessed: datetime = field(default_factory=datetime.now)
@@ -391,18 +391,18 @@ class DocumentRTM:
 class ConceptLink:
     """Cross-reference between conversation and document knowledge"""
     link_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    
+
     # Links conversation RTM nodes to document concepts
     conversation_node_id: str = ""
     conversation_tree_id: str = ""
     document_concept_id: str = ""
     document_id: str = ""
-    
+
     # Relationship information
     relationship_type: LinkRelationship = LinkRelationship.DISCUSSES
     confidence_score: float = 0.5
     context: str = ""  # Where/how the link was identified
-    
+
     # Metadata
     created: datetime = field(default_factory=datetime.now)
     validated: bool = False
@@ -415,12 +415,12 @@ class KnowledgeShelf:
     domain: KnowledgeDomain = KnowledgeDomain.GENERAL_KNOWLEDGE
     name: str = ""
     description: str = ""
-    
+
     # Organization
     document_ids: list[str] = field(default_factory=list)
     featured_concepts: list[str] = field(default_factory=list)
     subcategories: dict[str, list[str]] = field(default_factory=dict)
-    
+
     # Metadata
     tags: list[str] = field(default_factory=list)
     created: datetime = field(default_factory=datetime.now)
@@ -431,25 +431,25 @@ class KnowledgeShelf:
 class BlendedQueryResult:
     """Unified response combining conversation and document knowledge"""
     query: str = ""
-    
+
     # Formal knowledge from documents
     formal_knowledge: dict[str, Any] = field(default_factory=dict)
-    
+
     # Conversational insights from dialogue RTMs
     conversation_insights: dict[str, Any] = field(default_factory=dict)
-    
+
     # Cross-references between tracks
     cross_references: list[ConceptLink] = field(default_factory=list)
-    
+
     # Unified synthesis
     unified_summary: str = ""
     confidence_score: float = 0.5
-    
+
     # Query metadata
     formal_sources_count: int = 0
     conversation_sources_count: int = 0
     total_cross_references: int = 0
-    
+
     # Processing info
     timestamp: datetime = field(default_factory=datetime.now)
     processing_time_ms: int = 0

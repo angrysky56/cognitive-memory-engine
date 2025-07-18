@@ -40,7 +40,7 @@ class CloudProviderConfig:
     api_key: str = ""
     model: str = ""
     base_url: str = ""
-    max_tokens: int = 4096
+    max_tokens: int = 8164
     temperature: float = 0.7
     timeout: int = 60
 

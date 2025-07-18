@@ -35,19 +35,23 @@ class ContextAssembler:
         vector_manager=None,
         rtm_store=None,
         temporal_library=None,
+        enhanced_knowledge_tools=None,  # Add enhanced knowledge tools for fetch data
         max_context_length: int = 8192
     ):
         self.vector_manager = vector_manager
         self.rtm_store = rtm_store
         self.temporal_library = temporal_library
+        self.enhanced_knowledge_tools = enhanced_knowledge_tools  # For real-time fetch
         self.max_context_length = max_context_length
 
         # Context assembly strategies
         self.retrieval_strategies = {
             "hybrid": self._hybrid_retrieval,
+            "hybrid_with_fetch": self._hybrid_retrieval_with_fetch,  # New strategy
             "vector_only": self._vector_only_retrieval,
             "temporal_only": self._temporal_retrieval,
-            "rtm_traversal": self._rtm_traversal_retrieval
+            "rtm_traversal": self._rtm_traversal_retrieval,
+            "fetch_enhanced": self._fetch_enhanced_retrieval  # Pure fetch strategy
         }
 
         logger.info("Context Assembler initialized")
@@ -213,6 +217,55 @@ class ContextAssembler:
             # Return empty list on error rather than mock data
             return []
 
+    async def _hybrid_retrieval_with_fetch(
+        self,
+        query: str,
+        max_depth: int,
+        temporal_scope: str | None,
+        session_id: str | None
+    ) -> list[RTMNode]:
+        """
+        Hybrid retrieval that includes real-time fetched content.
+
+        This strategy:
+        1. Performs standard hybrid retrieval from stored knowledge
+        2. Identifies if fresh information might be needed
+        3. Fetches relevant URLs/searches in real-time
+        4. Converts fetched content to RTMNode format for AI processing
+        5. Combines and prioritizes all sources
+        """
+        results = []
+
+        try:
+            # Step 1: Get stored knowledge using standard hybrid retrieval
+            stored_results = await self._hybrid_retrieval(query, max_depth, temporal_scope, session_id)
+            results.extend(stored_results)
+
+            # Step 2: Determine if fresh content is needed
+            if self.enhanced_knowledge_tools and self._should_fetch_fresh_content(query, stored_results):
+                logger.info(f"Fetching fresh content for query: {query[:50]}...")
+
+                # Step 3: Fetch fresh content (no AI processing - direct ingestion)
+                fresh_content = await self._fetch_fresh_content_for_query(query, max_depth)
+
+                # Step 4: Convert fetched content to RTMNode format
+                fetch_nodes = self._convert_fetch_to_rtm_nodes(fresh_content, query)
+
+                # Step 5: Boost salience for fresh content (it's current/relevant)
+                for node in fetch_nodes:
+                    node.salience_score *= 1.3  # Fresh content gets priority boost
+
+                results.extend(fetch_nodes)
+
+                logger.info(f"Added {len(fetch_nodes)} fresh content nodes")
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Error in hybrid retrieval with fetch: {e}")
+            # Fallback to standard hybrid retrieval
+            return await self._hybrid_retrieval(query, max_depth, temporal_scope, session_id)
+
     async def _vector_only_retrieval(
         self,
         query: str,
@@ -245,6 +298,54 @@ class ContextAssembler:
         """RTM tree traversal retrieval strategy."""
         # TODO: Implement RTM traversal when rtm_store is complete
         return []
+
+    async def _fetch_enhanced_retrieval(
+        self,
+        query: str,
+        max_depth: int,
+        temporal_scope: str | None,
+        session_id: str | None
+    ) -> list[RTMNode]:
+        """
+        Pure fetch-enhanced retrieval for real-time information needs.
+
+        This strategy prioritizes fresh content over stored knowledge.
+        Ideal for current events, recent developments, or when stored
+        knowledge appears stale or insufficient.
+        """
+        results = []
+
+        try:
+            if not self.enhanced_knowledge_tools:
+                logger.warning("Enhanced knowledge tools not available for fetch retrieval")
+                # Fallback to hybrid retrieval
+                return await self._hybrid_retrieval(query, max_depth, temporal_scope, session_id)
+
+            # Step 1: Fetch fresh content aggressively
+            fresh_content = await self._fetch_fresh_content_for_query(query, max_depth * 2)
+
+            # Step 2: Convert to RTMNode format
+            fetch_nodes = self._convert_fetch_to_rtm_nodes(fresh_content, query)
+
+            # Step 3: Get minimal stored context for background
+            stored_results = await self._hybrid_retrieval(query, max_depth // 2, temporal_scope, session_id)
+
+            # Step 4: Prioritize fresh over stored
+            for node in fetch_nodes:
+                node.salience_score *= 1.5  # Strong boost for fresh content
+
+            for node in stored_results:
+                node.salience_score *= 0.7  # Reduce stored content priority
+
+            results = fetch_nodes + stored_results
+
+            logger.info(f"Fetch-enhanced retrieval: {len(fetch_nodes)} fresh + {len(stored_results)} stored nodes")
+            return results
+
+        except Exception as e:
+            logger.error(f"Error in fetch-enhanced retrieval: {e}")
+            # Fallback to standard hybrid retrieval
+            return await self._hybrid_retrieval(query, max_depth, temporal_scope, session_id)
 
     async def _prioritize_by_neural_gain(
         self,
@@ -465,5 +566,142 @@ class ContextAssembler:
             "vector_manager_available": self.vector_manager is not None,
             "rtm_store_available": self.rtm_store is not None,
             "temporal_library_available": self.temporal_library is not None,
+            "enhanced_knowledge_tools_available": self.enhanced_knowledge_tools is not None,
+            "fetch_capabilities": {
+                "real_time_content": self.enhanced_knowledge_tools is not None,
+                "url_extraction": True,
+                "search_integration": self.enhanced_knowledge_tools is not None,
+                "fresh_content_detection": True
+            },
             "last_updated": datetime.now().isoformat()
         }
+
+    def _should_fetch_fresh_content(self, query: str, stored_results: list[RTMNode]) -> bool:
+        """
+        Determine if fresh content should be fetched based on query analysis.
+
+        Fetch fresh content when:
+        1. Query contains time-sensitive keywords
+        2. Stored results are sparse or low-quality
+        3. Query asks for recent information
+        4. No relevant stored content found
+        """
+        # Time-sensitive keywords that suggest fresh content is needed
+        time_sensitive_keywords = {
+            'recent', 'latest', 'current', 'new', 'today', 'yesterday',
+            'this week', 'this month', 'now', 'updated', 'breaking',
+            'fresh', 'live', 'real-time', '2024', '2025'
+        }
+
+        query_lower = query.lower()
+
+        # Check for time-sensitive keywords
+        if any(keyword in query_lower for keyword in time_sensitive_keywords):
+            return True
+
+        # Check if stored results are insufficient
+        if len(stored_results) < 2:
+            return True
+
+        # Check if stored results have low average salience
+        if stored_results:
+            avg_salience = sum(node.salience_score for node in stored_results) / len(stored_results)
+            if avg_salience < 0.5:
+                return True
+
+        # Check if stored content is old (basic heuristic)
+        if stored_results:
+            now = datetime.now()
+            recent_threshold = now - timedelta(days=7)
+            recent_count = sum(1 for node in stored_results if node.timestamp > recent_threshold)
+            if recent_count / len(stored_results) < 0.3:  # Less than 30% recent content
+                return True
+
+        return False
+
+    async def _fetch_fresh_content_for_query(self, query: str, max_results: int) -> list[dict[str, Any]]:
+        """
+        Fetch fresh content relevant to the query using enhanced knowledge tools.
+
+        Returns raw fetch results for conversion to RTMNode format.
+        """
+        fresh_content = []
+
+        try:
+            if not self.enhanced_knowledge_tools:
+                return fresh_content
+
+            # Strategy 1: Search for current information
+            if hasattr(self.enhanced_knowledge_tools, '_perform_search'):
+                search_results = await self.enhanced_knowledge_tools._perform_search(query, max_results)
+                for result in search_results:
+                    fresh_content.append({
+                        'type': 'search_result',
+                        'content': result.get('content', ''),
+                        'title': result.get('title', ''),
+                        'url': result.get('url', ''),
+                        'source': 'web_search'
+                    })
+
+            # Strategy 2: If query looks like it needs specific URL content
+            urls_in_query = self._extract_urls_from_query(query)
+            for url in urls_in_query:
+                if hasattr(self.enhanced_knowledge_tools, '_fetch_content_from_url'):
+                    url_content = await self.enhanced_knowledge_tools._fetch_content_from_url(url)
+                    fresh_content.append({
+                        'type': 'url_fetch',
+                        'content': url_content,
+                        'title': f'Content from {url}',
+                        'url': url,
+                        'source': 'direct_fetch'
+                    })
+
+            return fresh_content
+
+        except Exception as e:
+            logger.error(f"Error fetching fresh content: {e}")
+            return fresh_content
+
+    def _convert_fetch_to_rtm_nodes(self, fetch_results: list[dict[str, Any]], query: str) -> list[RTMNode]:
+        """
+        Convert raw fetch results to RTMNode format for AI processing.
+
+        This creates temporary RTMNodes that can be processed alongside
+        stored knowledge without requiring permanent storage.
+        """
+        nodes = []
+
+        try:
+            for i, result in enumerate(fetch_results):
+                # Create a temporary RTMNode from fetch result
+                node = RTMNode(
+                    node_id=f"fetch_{i}_{hash(result.get('url', query)) % 10000}",
+                    tree_id="fresh_content",  # Special tree ID for fetched content
+                    content=result.get('content', ''),
+                    summary=result.get('title', '')[:200] + "..." if len(result.get('title', '')) > 200 else result.get('title', ''),
+                    salience_score=1.0,  # Will be adjusted by calling method
+                    temporal_scale=TemporalScale("hour"),  # Fresh content is immediate
+                    depth=0,  # Fetched content is at surface level
+                    timestamp=datetime.now(),  # Mark as fresh
+                    metadata={
+                        'source': result.get('source', 'unknown'),
+                        'url': result.get('url', ''),
+                        'fetch_type': result.get('type', 'unknown'),
+                        'is_fresh_content': True,
+                        'query_context': query[:100]  # Store query context
+                    }
+                )
+
+                nodes.append(node)
+
+        except Exception as e:
+            logger.error(f"Error converting fetch results to RTMNodes: {e}")
+
+        return nodes
+
+    def _extract_urls_from_query(self, query: str) -> list[str]:
+        """Extract URLs from user query for direct fetching."""
+        import re
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+        urls = re.findall(url_pattern, query)
+        return urls[:3]  # Limit to 3 URLs for performance

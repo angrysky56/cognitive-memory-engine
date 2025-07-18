@@ -16,12 +16,12 @@ MISSING IMPLEMENTATION:
 ----------------------
 
 Track 2: Document Knowledge Storage
-- TODO: Add store_document_knowledge(content, root_concept, domain) 
+- TODO: Add store_document_knowledge(content, root_concept, domain)
 - TODO: Create DocumentRTM with formal knowledge hierarchies
 - TODO: Build structured concept nodes (not conversation nodes)
 - TODO: Root node approach: "SAPE" -> SPL, PKG, SEE, CML, Reflective Controller
 
-Track 3: Blended Integration Layer  
+Track 3: Blended Integration Layer
 - TODO: Add ConceptLink cross-references between tracks
 - TODO: Implement link_conversation_to_knowledge()
 - TODO: Create unified query interface combining both tracks
@@ -34,7 +34,7 @@ Storage Architecture Changes:
 
 Query Interface Enhancement:
 - TODO: query_blended_knowledge() returning formal + conversational insights
-- TODO: Topic-specific retrieval: get_concept("SAPE") 
+- TODO: Topic-specific retrieval: get_concept("SAPE")
 - TODO: Domain browsing: browse_shelf(AI_ARCHITECTURE)
 
 PRIORITY: Implement Document Knowledge Track first, then Integration Layer
@@ -43,22 +43,31 @@ PRIORITY: Implement Document Knowledge Track first, then Integration Layer
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from enhanced_knowledge_tools.enhanced_server_tools import EnhancedKnowledgeServerTools
+
+from ..comprehension.document_knowledge_builder import DocumentKnowledgeBuilder
 from ..comprehension.narrative_tree_builder import NarrativeTreeBuilder
 from ..comprehension.temporal_organizer import TemporalOrganizer
-from ..comprehension.document_knowledge_builder import DocumentKnowledgeBuilder
+from ..config import get_cloud_provider_config
 from ..production.response_generator import ResponseGenerator
+from ..storage.document_store import DocumentStore
 from ..storage.rtm_graphs import RTMGraphStore
 from ..storage.temporal_library import TemporalLibrary
 from ..storage.vector_store import VectorStore
-from ..storage.document_store import DocumentStore
-from ..types import (ConversationTurn, SystemConfig, TemporalScale, 
-                    KnowledgeDomain, DocumentRTM, BlendedQueryResult)
+from ..types import (
+    ConversationTurn,
+    KnowledgeDomain,
+    NeuralGainConfig,
+    RTMConfig,
+    SystemConfig,
+    TemporalScale,
+)
 from ..workspace.context_assembler import ContextAssembler
-from ..workspace.vector_manager import VectorManager
 from ..workspace.svg_vector_manager import SVGVectorManager
-from ..config import get_cloud_provider_config
+from ..workspace.vector_manager import VectorManager
 from .exceptions import CMEError, CMEInitializationError
 
 logger = logging.getLogger(__name__)
@@ -82,127 +91,121 @@ class CognitiveMemoryEngine:
         Args:
             config: Optional system configuration
         """
-        self.config = config or SystemConfig()
-        self.initialized = False
+        self.config = config or SystemConfig(
+            data_directory="data",
+            llm_model="gpt-4.1-nano",
+            embedding_model="all-MiniLM-L6-v2",
+            rtm_config=RTMConfig(
+                max_branching_factor=4,
+                max_recall_depth=6,
+                max_summary_length=150
+            ),
+            neural_gain_config=NeuralGainConfig(
+                base_salience=1.0,
+                temporal_decay_factor=0.1,
+                max_gain_multiplier=3.0
+            ),
+            max_context_length=4096,
+            vector_similarity_threshold=0.8,
+            auto_archive_days=30
+        )
 
-        # Core components (initialized in initialize())
-        self.narrative_builder: NarrativeTreeBuilder | None = None
-        self.temporal_organizer: TemporalOrganizer | None = None
-        self.context_assembler: ContextAssembler | None = None
-        self.vector_manager: VectorManager | None = None
-        self.response_generator: ResponseGenerator | None = None
-        self.vector_store: VectorStore | None = None
-        self.temporal_library: TemporalLibrary | None = None
-        self.rtm_store: RTMGraphStore | None = None
-        
-        # Dual-track architecture components (Track 2 & 3)
-        self.document_store: DocumentStore | None = None
-        self.document_builder: DocumentKnowledgeBuilder | None = None
+        # Initialize all components directly in the constructor
 
-        # Session tracking
-        self.active_sessions: dict[str, datetime] = {}
+        data_dir = Path(self.config.data_directory)
+        data_dir.mkdir(exist_ok=True)
 
-        logger.info("Cognitive Memory Engine created")
+        # Initialize storage systems
+        self.vector_store = VectorStore({
+            "persist_directory": str(data_dir / "chroma_db"),
+            "collection_name": "cme_memory"
+        })
+        # Note: In a real async application, we'd need an async constructor
+        # or a factory pattern. For now, we assume sync init is sufficient
+        # for object creation, and async operations happen in methods.
 
-    async def initialize(self) -> None:
-        """Initialize all engine components."""
-        if self.initialized:
-            return
+        self.temporal_library = TemporalLibrary(str(data_dir / "temporal"))
+        self.rtm_store = RTMGraphStore(str(data_dir / "rtm_graphs"))
+        self.document_store = DocumentStore(str(data_dir / "document_knowledge"))
 
-        try:
-            logger.info("Initializing Cognitive Memory Engine components...")
+        # Get cloud provider configuration
+        cloud_config = get_cloud_provider_config()
 
-            # Ensure data directory exists
-            data_dir = Path(self.config.data_directory)
-            data_dir.mkdir(exist_ok=True)
+        # Initialize comprehension components
+        self.document_builder = DocumentKnowledgeBuilder(
+            cloud_config=cloud_config,
+            document_store=self.document_store
+        )
+        self.narrative_builder = NarrativeTreeBuilder(
+            cloud_config=cloud_config,
+            rtm_store=self.rtm_store,
+            config=self.config.rtm_config
+        )
 
-            # Initialize storage systems first
-            logger.info("Initializing storage systems...")
-
-            self.vector_store = VectorStore({
-                "persist_directory": str(data_dir / "chroma_db"),
-                "collection_name": "cme_memory"
-            })
-            await self.vector_store.initialize()
-
-            self.temporal_library = TemporalLibrary(str(data_dir / "temporal"))
-            await self.temporal_library.initialize()
-
-            self.rtm_store = RTMGraphStore(str(data_dir / "rtm_graphs"))
-
-            # Initialize dual-track architecture components (Track 2)
-            logger.info("Initializing document knowledge system...")
-            
-            self.document_store = DocumentStore(str(data_dir / "document_knowledge"))
-            
-            # Get cloud provider configuration
-            cloud_config = get_cloud_provider_config()
-            
-            self.document_builder = DocumentKnowledgeBuilder(
-                cloud_config=cloud_config,
-                document_store=self.document_store
+        # Initialize workspace components
+        if self.config.vector_manager == 'svg':
+            self.vector_manager = SVGVectorManager(
+                storage_path=str(data_dir / "vectors"),
+                embedding_model=self.config.embedding_model,
+                config=self.config.neural_gain_config,
+                svg_config=self.config.svg_config
             )
-
-            # Initialize comprehension components
-            logger.info("Initializing comprehension module...")
-
-            self.narrative_builder = NarrativeTreeBuilder(
-                cloud_config=cloud_config,
-                rtm_store=self.rtm_store,
-                config=self.config.rtm_config
-            )
-
-            self.temporal_organizer = TemporalOrganizer(
-                temporal_library=self.temporal_library,
-                vector_manager=None,  # Set after vector_manager is created
-                rtm_store=self.rtm_store,  # Pass the initialized rtm_store
+        else:
+            self.vector_manager = VectorManager(
+                storage_path=str(data_dir / "vectors"),
+                embedding_model=self.config.embedding_model,
                 config=self.config.neural_gain_config
             )
 
-            # Initialize workspace components
-            logger.info("Initializing workspace...")
+        self.temporal_organizer = TemporalOrganizer(
+            temporal_library=self.temporal_library,
+            vector_manager=self.vector_manager,
+            rtm_store=self.rtm_store,
+            config=self.config.neural_gain_config
+        )
 
-            if self.config.vector_manager == 'svg':
-                logger.info("Using SVGVectorManager")
-                self.vector_manager = SVGVectorManager(
-                    storage_path=str(data_dir / "vectors"),
-                    embedding_model=self.config.embedding_model,
-                    config=self.config.neural_gain_config,
-                    svg_config=self.config.svg_config
-                )
-            else:
-                logger.info("Using ChromaDB VectorManager")
-                self.vector_manager = VectorManager(
-                    storage_path=str(data_dir / "vectors"),
-                    embedding_model=self.config.embedding_model,
-                    config=self.config.neural_gain_config
-                )
+        self.context_assembler = ContextAssembler(
+            vector_manager=self.vector_manager,
+            rtm_store=self.rtm_store,
+            temporal_library=self.temporal_library,
+            max_context_length=self.config.max_context_length
+        )
 
-            # Now set vector_manager in temporal_organizer
-            self.temporal_organizer.vector_manager = self.vector_manager
+        # Initialize production components
+        self.response_generator = ResponseGenerator(
+            cloud_config=cloud_config,
+            max_response_length=1000,
+            temperature=0.7
+        )
 
-            self.context_assembler = ContextAssembler(
-                vector_manager=self.vector_manager,
-                rtm_store=self.rtm_store,
-                temporal_library=self.temporal_library,
-                max_context_length=self.config.max_context_length
-            )
+        self.initialized = True
+        self.enhanced_knowledge_tools: EnhancedKnowledgeServerTools | None = None
+        self.active_sessions: dict[str, datetime] = {}
+        logger.info("Cognitive Memory Engine created and components initialized")
 
-            # Initialize production components
-            logger.info("Initializing production module...")
+    def _ensure_initialized(self):
+        """Ensure the engine is initialized before use."""
+        if not self.initialized:
+            # This should not happen with the new structure, but kept for safety
+            raise CMEError("Engine is not initialized.")
 
-            self.response_generator = ResponseGenerator(
-                cloud_config=cloud_config,
-                max_response_length=1000,
-                temperature=0.7
-            )
+    def _ensure_component(self, component, name: str):
+        """Ensure a component is available, raise error if not."""
+        if component is None:
+            raise CMEError(f"{name} component not available. Engine may not be properly initialized.")
 
-            self.initialized = True
-            logger.info("Cognitive Memory Engine initialization complete")
+    async def initialize(self) -> None:
+        """
+        Asynchronously initialize components that require it (like database connections).
+        """
+        if not self.initialized:
+             # Fallback if somehow __init__ was bypassed or failed silently
+            self.__init__(self.config)
 
-        except Exception as e:
-            logger.error(f"Failed to initialize Cognitive Memory Engine: {e}")
-            raise CMEInitializationError(f"Initialization failed: {e}") from e
+        logger.info("Running async initializations...")
+        await self.vector_store.initialize()
+        await self.temporal_library.initialize()
+        logger.info("Async initializations complete.")
 
     @property
     def llm_provider(self):
@@ -211,16 +214,21 @@ class CognitiveMemoryEngine:
             return self.narrative_builder.provider
         elif self.response_generator and self.response_generator.provider:
             return self.response_generator.provider
-        else:
-            raise CMEError("No LLM provider available. Engine may not be properly initialized.")
+        return None
 
     def get_current_model(self) -> str:
         """Get the currently selected model."""
-        return self.llm_provider.get_current_model()
+        provider = self.llm_provider
+        if provider:
+            return provider.get_current_model()
+        raise CMEError("No LLM provider available.")
 
     async def get_available_models(self) -> list[str]:
         """Get available models from the provider."""
-        return await self.llm_provider.get_available_models()
+        provider = self.llm_provider
+        if provider:
+            return await provider.get_available_models()
+        raise CMEError("No LLM provider available.")
 
     def set_model(self, model_name: str) -> None:
         """
@@ -233,13 +241,10 @@ class CognitiveMemoryEngine:
             raise CMEInitializationError("Engine must be initialized before setting a model.")
 
         # The provider's set_model updates the shared cloud_config object.
-        if self.narrative_builder and self.narrative_builder.provider:
-            self.narrative_builder.provider.set_model(model_name)
+        provider = self.llm_provider
+        if provider:
+            provider.set_model(model_name)
             logger.info(f"Set LLM model to '{model_name}' for all providers.")
-
-            # Also update the convenience attributes on components
-            if self.response_generator:
-                self.response_generator.provider.set_model(model_name)
         else:
             logger.warning("No provider available to set model.")
 
@@ -261,8 +266,13 @@ class CognitiveMemoryEngine:
         if not self.initialized:
             await self.initialize()
 
+        self._ensure_component(self.narrative_builder, "narrative_builder")
+        self._ensure_component(self.temporal_organizer, "temporal_organizer")
+        self._ensure_component(self.vector_manager, "vector_manager")
+
         try:
             timestamp = datetime.now()
+            context = context or {}  # Ensure context is not None
             session_id = context.get("session_id", f"session_{timestamp.strftime('%Y%m%d_%H%M%S')}")
 
             # Convert to ConversationTurn objects if needed
@@ -288,12 +298,15 @@ class CognitiveMemoryEngine:
             )
 
             # Step 1a: Store the RTM tree
-            if self.rtm_store:
+            if self.rtm_store and rtm_tree:
                 await self.rtm_store.store_tree(rtm_tree)
 
-            logger.info(f"Built and stored RTM tree {rtm_tree.tree_id} with {rtm_tree.node_count} nodes")
+            if rtm_tree:
+                logger.info(f"Built and stored RTM tree {rtm_tree.tree_id} with {rtm_tree.node_count} nodes")
 
             # Step 2: Organize temporally into books and shelves
+            if not self.temporal_organizer:
+                raise CMEError("Temporal organizer not initialized")
             temporal_book = await self.temporal_organizer.organize_conversation(
                 conversation_turns,
                 rtm_tree,
@@ -355,25 +368,28 @@ class CognitiveMemoryEngine:
     ) -> dict[str, Any]:
         """
         Store formal document as structured knowledge RTM.
-        
+
         This creates:
         - Root node for main concept (e.g., "SAPE")
         - Hierarchical breakdown of document structure
         - Concept nodes for each major component
         - Cross-linkable knowledge graph (not conversation narrative)
-        
+
         Args:
             document_content: Raw document text
             root_concept: Main concept name (e.g., "SAPE")
             domain: Knowledge domain string (converted to enum)
             metadata: Optional source metadata
-            
+
         Returns:
             Storage results with document ID and analysis
         """
         if not self.initialized:
             await self.initialize()
-        
+
+        self._ensure_component(self.document_builder, "document_builder")
+        self._ensure_component(self.document_store, "document_store")
+
         try:
             # Convert domain string to enum
             try:
@@ -381,9 +397,9 @@ class CognitiveMemoryEngine:
             except ValueError:
                 logger.warning(f"Unknown domain '{domain}', using GENERAL_KNOWLEDGE")
                 domain_enum = KnowledgeDomain.GENERAL_KNOWLEDGE
-            
+
             logger.info(f"Storing document knowledge for '{root_concept}' in domain {domain_enum.value}")
-            
+
             # Use document builder to create and store DocumentRTM
             document_id = await self.document_builder.store_document_knowledge(
                 document_content=document_content,
@@ -391,13 +407,13 @@ class CognitiveMemoryEngine:
                 domain=domain_enum,
                 metadata=metadata
             )
-            
+
             # Get the stored document for analysis
             document = await self.document_store.get_document(document_id)
-            
+
             if not document:
                 raise CMEError("Document was stored but could not be retrieved")
-            
+
             # Create result summary
             result = {
                 "document_id": document_id,
@@ -423,10 +439,10 @@ class CognitiveMemoryEngine:
                 "metadata": document.source_metadata,
                 "status": "success"
             }
-            
+
             logger.info(f"Successfully stored document knowledge '{root_concept}' with {document.total_concepts} concepts")
             return result
-            
+
         except Exception as e:
             logger.error(f"Failed to store document knowledge for '{root_concept}': {e}")
             raise CMEError(f"Document knowledge storage failed: {e}") from e
@@ -438,25 +454,30 @@ class CognitiveMemoryEngine:
     ) -> list[dict[str, Any]]:
         """
         Create cross-references between conversation and document knowledge.
-        
+
         Analyzes conversation for mentions of formal concepts and creates
         bidirectional links for blended retrieval.
-        
+
         Args:
             conversation_id: ID of conversation to analyze
             document_concept_id: Optional specific concept to link to
-            
+
         Returns:
             List of concept links created
         """
+        if not self.initialized:
+            await self.initialize()
+
+        self._ensure_component(self.document_store, "document_store")
+
         logger.info(f"Creating cross-references for conversation {conversation_id}")
-        
+
         try:
             # Get all document concepts for matching
             all_documents = await self.document_store.get_all_documents()
             concept_names = []
             concept_lookup = {}
-            
+
             for doc in all_documents:
                 for concept_id, concept in doc.concepts.items():
                     concept_names.append(concept.name)
@@ -465,23 +486,26 @@ class CognitiveMemoryEngine:
                         'document_id': doc.doc_id,
                         'concept': concept
                     }
-            
+
             # Load the conversation RTM tree
             conversation_tree = await self.rtm_store.load_tree(conversation_id)
             if not conversation_tree:
                 logger.warning(f"Conversation {conversation_id} not found")
                 return []
-                
+
             # Analyze conversation nodes for concept mentions
             links = []
-            for node in conversation_tree.nodes:
+            # The .nodes attribute is a dict of {node_id: node_object}
+            for node in conversation_tree.nodes.values():
+                if not node or not hasattr(node, 'content') or not hasattr(node, 'node_id'):
+                    continue
                 content_lower = node.content.lower()
-                
+
                 # Check for mentions of formal concepts
                 for concept_name in concept_names:
                     if concept_name.lower() in content_lower:
                         concept_info = concept_lookup[concept_name.lower()]
-                        
+
                         # Create concept link
                         link = {
                             'link_id': f"link_{conversation_id}_{concept_info['concept_id']}",
@@ -494,10 +518,10 @@ class CognitiveMemoryEngine:
                             'context_snippet': content_lower[:100]
                         }
                         links.append(link)
-                        
+
             logger.info(f"Created {len(links)} cross-reference links")
             return links
-            
+
         except Exception as e:
             logger.error(f"Error creating cross-references: {e}")
             return []
@@ -510,23 +534,28 @@ class CognitiveMemoryEngine:
     ) -> dict[str, Any]:
         """
         Unified query interface combining both knowledge tracks.
-        
+
         Returns:
         - formal_knowledge: Structured info from document RTMs
-        - conversation_insights: Context from dialogue RTMs  
+        - conversation_insights: Context from dialogue RTMs
         - cross_references: Links between the tracks
         - unified_summary: Blended understanding
-        
+
         Args:
             query: Natural language query
             include_formal: Include formal document knowledge
             include_conversational: Include conversation insights
-            
+
         Returns:
             BlendedQueryResult with combined knowledge
         """
+        if not self.initialized:
+            await self.initialize()
+
+        self._ensure_component(self.document_store, "document_store")
+
         logger.info(f"Blended query: '{query[:50]}...'")
-        
+
         result = {
             'query': query,
             'formal_knowledge': {},
@@ -535,21 +564,23 @@ class CognitiveMemoryEngine:
             'unified_summary': '',
             'confidence_score': 0.0
         }
-        
+
         try:
             # Track 1: Query formal document knowledge
             if include_formal:
                 # Search for matching concepts
+                if not self.document_store:
+                    raise CMEError("Document store not initialized")
                 all_documents = await self.document_store.get_all_documents()
                 formal_matches = []
-                
+
                 for doc in all_documents:
                     for concept_id, concept in doc.concepts.items():
                         # Simple relevance scoring (could be improved with semantic similarity)
                         concept_text = f"{concept.name} {concept.description}"
                         query_words = set(query.lower().split())
                         concept_words = set(concept_text.lower().split())
-                        
+
                         # Calculate overlap score
                         overlap = len(query_words & concept_words)
                         if overlap > 0:
@@ -560,11 +591,11 @@ class CognitiveMemoryEngine:
                                 'relevance_score': overlap / len(query_words),
                                 'document_title': doc.root_concept
                             })
-                
+
                 # Sort by relevance and take top matches
                 formal_matches.sort(key=lambda x: x['relevance_score'], reverse=True)
                 result['formal_knowledge'] = formal_matches[:3]
-                
+
             # Track 2: Query conversation memory
             if include_conversational:
                 conversation_results = await self.query_memory(
@@ -572,20 +603,20 @@ class CognitiveMemoryEngine:
                     context_depth=3,
                     max_results=5
                 )
-                
+
                 result['conversation_insights'] = {
                     'results': conversation_results.get('results', []),
                     'context_summary': conversation_results.get('context_summary', ''),
                     'total_results': conversation_results.get('total_results', 0)
                 }
-                
+
             # Track 3: Find cross-references
             if include_formal and include_conversational:
                 if result['formal_knowledge'] and result['conversation_insights']['results']:
                     # Find potential cross-references between formal concepts and conversation
                     for formal_match in result['formal_knowledge']:
                         concept_name = formal_match['concept'].name
-                        
+
                         for conv_result in result['conversation_insights']['results']:
                             if concept_name.lower() in conv_result.get('content', '').lower():
                                 result['cross_references'].append({
@@ -594,38 +625,38 @@ class CognitiveMemoryEngine:
                                     'relationship': 'mentions',
                                     'confidence': 0.7
                                 })
-                                
+
             # Generate unified summary
             summary_parts = []
-            
+
             if result['formal_knowledge']:
                 formal_summary = f"Formal knowledge: Found {len(result['formal_knowledge'])} relevant concepts"
                 top_concept = result['formal_knowledge'][0]['concept']
                 formal_summary += f" including '{top_concept.name}': {top_concept.description[:100]}..."
                 summary_parts.append(formal_summary)
-                
+
             if result['conversation_insights']['results']:
                 conv_count = len(result['conversation_insights']['results'])
                 conv_summary = f"Conversation insights: Found {conv_count} relevant discussion fragments"
                 summary_parts.append(conv_summary)
-                
+
             if result['cross_references']:
                 cross_summary = f"Cross-references: {len(result['cross_references'])} connections between formal knowledge and conversations"
                 summary_parts.append(cross_summary)
-                
+
             result['unified_summary'] = '. '.join(summary_parts) if summary_parts else "No relevant knowledge found"
-            
+
             # Calculate overall confidence
             formal_confidence = 0.8 if result['formal_knowledge'] else 0.0
             conv_confidence = 0.6 if result['conversation_insights']['results'] else 0.0
             cross_confidence = 0.9 if result['cross_references'] else 0.0
-            
+
             result['confidence_score'] = max(formal_confidence, conv_confidence, cross_confidence)
-            
+
             logger.info(f"Blended query complete: {len(result['formal_knowledge'])} formal, {len(result['conversation_insights'].get('results', []))} conversational, {len(result['cross_references'])} cross-refs")
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Error in blended query: {e}")
             result['unified_summary'] = f"Error processing query: {str(e)}"
@@ -634,31 +665,33 @@ class CognitiveMemoryEngine:
     async def get_concept(self, concept_name: str) -> dict[str, Any] | None:
         """
         Direct concept retrieval from document knowledge.
-        
+
         Returns structured knowledge about specific concept,
         not conversation fragments.
-        
+
         Args:
             concept_name: Name of concept to retrieve
-            
+
         Returns:
             Concept information dict or None if not found
         """
         if not self.initialized:
             await self.initialize()
-        
+
+        self._ensure_component(self.document_store, "document_store")
+
         try:
             # Search for concept in document store
             document, concept = await self.document_store.get_concept_by_name(concept_name)
-            
+
             if not document or not concept:
                 logger.info(f"Concept '{concept_name}' not found in document knowledge")
                 return None
-            
+
             # Update access time
             document.last_accessed = datetime.now()
             concept.last_updated = datetime.now()
-            
+
             # Build concept information
             concept_info = {
                 "concept_name": concept.name,
@@ -688,10 +721,10 @@ class CognitiveMemoryEngine:
                 "source_type": "formal_knowledge",
                 "retrieved_at": datetime.now().isoformat()
             }
-            
+
             logger.info(f"Retrieved concept '{concept_name}' from document knowledge")
             return concept_info
-            
+
         except Exception as e:
             logger.error(f"Failed to retrieve concept '{concept_name}': {e}")
             raise CMEError(f"Concept retrieval failed: {e}") from e
@@ -699,19 +732,21 @@ class CognitiveMemoryEngine:
     async def browse_knowledge_shelf(self, domain: str) -> dict[str, Any]:
         """
         Browse all concepts in a knowledge domain.
-        
+
         Returns organized view of all concepts in domain like
         AI_ARCHITECTURE, PROMPT_ENGINEERING, etc.
-        
+
         Args:
             domain: Knowledge domain to browse
-            
+
         Returns:
             Knowledge shelf information with documents and concepts
         """
         if not self.initialized:
             await self.initialize()
-        
+
+        self._ensure_component(self.document_store, "document_store")
+
         try:
             # Convert domain string to enum
             try:
@@ -723,15 +758,15 @@ class CognitiveMemoryEngine:
                     "available_domains": [d.value for d in KnowledgeDomain],
                     "suggestion": "Use one of the available domains listed above"
                 }
-            
+
             logger.info(f"Browsing knowledge shelf for domain {domain_enum.value}")
-            
+
             # Get knowledge shelf
             shelf = await self.document_store.get_shelf(domain_enum)
-            
+
             # Get all documents in this domain
             documents = await self.document_store.list_documents_by_domain(domain_enum)
-            
+
             # Build shelf information
             shelf_info = {
                 "domain": domain_enum.value,
@@ -741,7 +776,7 @@ class CognitiveMemoryEngine:
                 "featured_concepts": [],
                 "browsed_at": datetime.now().isoformat()
             }
-            
+
             # Add shelf metadata if exists
             if shelf:
                 shelf_info.update({
@@ -752,7 +787,7 @@ class CognitiveMemoryEngine:
                     "created": shelf.created.isoformat(),
                     "last_accessed": shelf.last_accessed.isoformat()
                 })
-            
+
             # Add document information
             for document in documents:
                 doc_info = {
@@ -764,7 +799,7 @@ class CognitiveMemoryEngine:
                     "last_accessed": document.last_accessed.isoformat(),
                     "concepts": []
                 }
-                
+
                 # Add top-level concepts (direct children of root)
                 if document.root_concept_id in document.concepts:
                     root_concept = document.concepts[document.root_concept_id]
@@ -779,7 +814,7 @@ class CognitiveMemoryEngine:
                                 "salience_score": child_concept.salience_score
                             }
                             doc_info["concepts"].append(concept_info)
-                            
+
                             # Add to featured concepts if high salience
                             if child_concept.salience_score > 0.7:
                                 shelf_info["featured_concepts"].append({
@@ -787,15 +822,15 @@ class CognitiveMemoryEngine:
                                     "document_title": document.title,
                                     "salience_score": child_concept.salience_score
                                 })
-                
+
                 shelf_info["documents"].append(doc_info)
-            
+
             # Sort featured concepts by salience
             shelf_info["featured_concepts"].sort(key=lambda x: x["salience_score"], reverse=True)
-            
+
             logger.info(f"Retrieved {len(documents)} documents from {domain_enum.value} shelf")
             return shelf_info
-            
+
         except Exception as e:
             logger.error(f"Failed to browse knowledge shelf for domain '{domain}': {e}")
             raise CMEError(f"Knowledge shelf browsing failed: {e}") from e
@@ -821,6 +856,9 @@ class CognitiveMemoryEngine:
         """
         if not self.initialized:
             await self.initialize()
+
+        self._ensure_component(self.temporal_organizer, "temporal_organizer")
+        self._ensure_component(self.context_assembler, "context_assembler")
 
         try:
             logger.info(f"Querying memory: '{query}' (depth: {context_depth}, scope: {time_scope})")
@@ -912,6 +950,9 @@ class CognitiveMemoryEngine:
         if not self.initialized:
             await self.initialize()
 
+        self._ensure_component(self.context_assembler, "context_assembler")
+        self._ensure_component(self.response_generator, "response_generator")
+
         try:
             logger.info(f"Generating response for: '{prompt[:50]}...'")
 
@@ -960,6 +1001,8 @@ class CognitiveMemoryEngine:
         """
         if not self.initialized:
             await self.initialize()
+
+        self._ensure_component(self.temporal_organizer, "temporal_organizer")
 
         try:
             # For now, return analysis of recent conversations if no ID specified
@@ -1017,6 +1060,10 @@ class CognitiveMemoryEngine:
         if not self.initialized:
             await self.initialize()
 
+        self._ensure_component(self.vector_store, "vector_store")
+        self._ensure_component(self.temporal_organizer, "temporal_organizer")
+        self._ensure_component(self.temporal_library, "temporal_library")
+
         try:
             stats = {
                 "engine_status": "initialized",
@@ -1034,7 +1081,7 @@ class CognitiveMemoryEngine:
                 temporal_stats = await self.temporal_organizer.get_statistics()
                 stats["temporal_library"] = temporal_stats
 
-            if include_details and self.narrative_builder:
+            if include_details and self.narrative_builder and self.response_generator:
                 # Component details
                 stats["components"] = {
                     "narrative_builder": {
@@ -1061,8 +1108,7 @@ class CognitiveMemoryEngine:
         if not self.initialized:
             await self.initialize()
 
-        if not self.temporal_library:
-            return []
+        self._ensure_component(self.temporal_library, "temporal_library")
 
         # Get recent books and extract conversation info
         try:
@@ -1097,25 +1143,23 @@ class CognitiveMemoryEngine:
 
     async def get_narrative_summaries(self) -> list[dict[str, Any]]:
         """Get narrative tree summaries."""
-        if not self.initialized or not self.rtm_store:
-            return []
-
+        if not self.initialized:
+            await self.initialize()
+        self._ensure_component(self.rtm_store, "rtm_store")
         return await self.rtm_store.list_trees(limit=20)
 
     async def get_temporal_organization(self) -> dict[str, Any]:
         """Get temporal organization structure."""
         if not self.initialized:
             await self.initialize()
-
-        if not self.temporal_organizer:
-            return {}
-
+        self._ensure_component(self.temporal_organizer, "temporal_organizer")
         return await self.temporal_organizer.get_statistics()
 
     async def get_active_context(self) -> dict[str, Any]:
         """Get current active workspace context."""
-        if not self.initialized or not self.context_assembler:
-            return {}
+        if not self.initialized:
+            await self.initialize()
+        self._ensure_component(self.context_assembler, "context_assembler")
 
         # Assemble context for a generic, recent query
         context = await self.context_assembler.assemble_context(
@@ -1144,7 +1188,7 @@ class CognitiveMemoryEngine:
                 await self.temporal_library.cleanup()
             if self.rtm_store:
                 await self.rtm_store.close()
-            
+
             # Cleanup dual-track components
             if self.document_store:
                 # Document store doesn't have async cleanup, but we can clear caches
