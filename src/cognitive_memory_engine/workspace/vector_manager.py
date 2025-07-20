@@ -16,10 +16,8 @@ import numpy as np
 
 try:
     import chromadb
-    from chromadb.config import Settings
 except ImportError:
     chromadb = None
-    Settings = None
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -75,16 +73,7 @@ class VectorManager:
         if chromadb is None:
             raise ImportError("chromadb package is required. Please install with: pip install chromadb")
 
-        if Settings is None:
-            raise ImportError("chromadb.config.Settings not available. Please reinstall chromadb")
-
-        self.client = chromadb.PersistentClient(
-            path=str(self.storage_path / "chroma_db"),
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=False
-            )
-        )
+        self.client = chromadb.Client()
 
         # Create collections for different content types
         self.collections = {

@@ -56,7 +56,7 @@ class ResponseGenerator:
             "context_utilization": 0.0
         }
 
-    async def _call_llm(self, prompt: str, temperature: float = None) -> str:
+    async def _call_llm(self, prompt: str, temperature: float | None = None) -> str:
         """Call the configured LLM provider with the given prompt."""
         temp = temperature if temperature is not None else self.temperature
         return await self.provider.generate(prompt, temperature=temp)
@@ -104,7 +104,7 @@ class ResponseGenerator:
             trust_adjusted=include_social_context and context.trust_score < 1.0,
             formality_adjusted=include_social_context and context.formality_level != 0.5,
             reasoning_chain=context.reasoning_chain.copy(),
-            model_used=self.cloud_config.model,
+            model_used=self.llm_model,
             generation_time_ms=generation_time
         )
 

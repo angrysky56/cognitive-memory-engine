@@ -33,7 +33,7 @@ dependencies = [
   "python-dotenv>=1.1.1",
   # AI and ML
   "openai>=1.97.0",
-  "google-genai>=1.0.0,<1.25.0", # Constrained by httpx compatibility
+  "google-genai",
   "anthropic>=0.57.1", # Claude API
   "sentence-transformers>=5.0.0",
   "torch>=2.7.1",
@@ -133,5 +133,5 @@ no_implicit_optional = true
 minversion = "7.0"
 addopts = "-ra -q --strict-markers"
 testpaths = [
-  "src/cognitive_memory_engine/tests",
+    ".",
 ]

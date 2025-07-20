@@ -8,9 +8,9 @@ Supports Ollama, OpenAI, Google (Gemini), and Anthropic.
 from abc import ABC, abstractmethod
 
 import anthropic
+import google.genai as genai
 import ollama
 import openai
-from google import genai
 
 
 class LLMProvider(ABC):

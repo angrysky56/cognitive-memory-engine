@@ -27,7 +27,7 @@ from ..core.exceptions import CMEError
 from ..task_manager import create_immediate_response, task_manager
 
 if TYPE_CHECKING:
-    from enhanced_knowledge_tools.enhanced_server_tools import EnhancedKnowledgeServerTools
+    from cognitive_memory_engine.mcp_server.enhanced_server_tools import EnhancedKnowledgeServerTools
 
 # Configure logging to stderr for MCP servers
 logging.basicConfig(
@@ -50,7 +50,7 @@ def import_enhanced_tools():
         if enhanced_tools_path.exists():
             import sys
             sys.path.insert(0, str(enhanced_tools_path))
-            from enhanced_knowledge_tools.enhanced_server_tools import EnhancedKnowledgeServerTools
+            from cognitive_memory_engine.mcp_server.enhanced_server_tools import EnhancedKnowledgeServerTools
             enhanced_tools_available = True
             logger.info("Enhanced knowledge tools imported successfully")
             return EnhancedKnowledgeServerTools

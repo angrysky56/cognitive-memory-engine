@@ -13,7 +13,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.cognitive_memory_engine.workspace.context_assembler import ContextAssembler
-from enhanced_knowledge_tools.enhanced_server_tools import initialize_enhanced_knowledge_tools
+from cognitive_memory_engine.mcp_server.enhanced_server_tools import initialize_enhanced_knowledge_tools
 
 async def demo_context_assembler_with_fetch():
     """Demonstrate context assembly with real-time fetch integration."""

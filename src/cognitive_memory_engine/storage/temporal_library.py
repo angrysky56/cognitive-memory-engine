@@ -11,7 +11,7 @@ import logging
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..types import LibraryShelf, ShelfCategory, TemporalBook, TemporalScale
 
@@ -262,7 +262,7 @@ class TemporalLibrary:
             print(f"Error loading shelf {shelf_id}: {e}")
             return None
 
-    async def find_books_by_session(self, session_id: str) -> List[TemporalBook]:
+    async def find_books_by_session(self, session_id: str) -> list[TemporalBook]:
         """Find all books associated with a session"""
         book_ids = self._session_index.get(session_id, [])
         books = []
@@ -274,7 +274,7 @@ class TemporalLibrary:
 
         return books
 
-    async def find_books_by_category(self, category: ShelfCategory) -> List[TemporalBook]:
+    async def find_books_by_category(self, category: ShelfCategory) -> list[TemporalBook]:
         """Find all books in a shelf category"""
         book_ids = self._category_index.get(category, [])
         books = []

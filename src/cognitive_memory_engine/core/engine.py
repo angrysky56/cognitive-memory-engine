@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from enhanced_knowledge_tools.enhanced_server_tools import EnhancedKnowledgeServerTools
+    from cognitive_memory_engine.mcp_server.enhanced_server_tools import EnhancedKnowledgeServerTools
 
 from ..comprehension.document_knowledge_builder import DocumentKnowledgeBuilder
 from ..comprehension.narrative_tree_builder import NarrativeTreeBuilder

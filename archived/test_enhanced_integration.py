@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from enhanced_knowledge_tools.enhanced_server_tools import EnhancedKnowledgeServerTools, initialize_enhanced_knowledge_tools
+from cognitive_memory_engine.mcp_server.enhanced_server_tools import EnhancedKnowledgeServerTools, initialize_enhanced_knowledge_tools
 
 def test_enhanced_tools_integration():
     """Test basic functionality of enhanced knowledge tools."""
