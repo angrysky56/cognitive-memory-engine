@@ -214,8 +214,8 @@ class AnthropicProvider(LLMProvider):
             "claude-3-5-sonnet-20241022",
             "claude-3-5-haiku-20241022",
             "claude-3-opus-20240229",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307"
+            "claude-4-sonnet",
+            "claude-4-opus"
         ]
 
     def get_current_model(self) -> str:
@@ -272,7 +272,7 @@ async def list_all_available_models(config) -> dict[str, list[str]]:
                 'api_key': config.api_key if hasattr(config, 'api_key') else '',
                 'base_url': getattr(config, 'base_url', ''),
                 'model': '',
-                'max_tokens': 4096
+                'max_tokens': 8164
             })()
 
             provider = LLMProviderFactory.create(temp_config)

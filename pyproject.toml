@@ -25,7 +25,7 @@ classifiers = [
 dependencies = [
   # MCP Server and Data Ingestion (Core functionality)
   "mcp[cli]>=1.2.0",
-  "mcp-server-fetch>=2025.4.7",  # Core dependency for data ingestion
+  "mcp-server-fetch>=2025.4.7", # Core dependency for data ingestion
   # Core dependencies
   "fastapi>=0.116.1",
   "uvicorn>=0.35.0",
@@ -42,9 +42,9 @@ dependencies = [
   "chromadb>=1.0.15",
   "networkx>=3.5",
   # Phase 3A: Semantic Enhancement Dependencies
-  "duckdb>=1.3.2",  # High-performance analytical database for graph queries
-  "typer>=0.16.0",  # Elegant CLI interface (elegance toolkit)
-  "rich>=14.0.0",   # Enhanced terminal UX (debugging toolkit)
+  "duckdb>=1.3.2", # High-performance analytical database for graph queries
+  "typer>=0.16.0", # Elegant CLI interface (elegance toolkit)
+  "rich>=14.0.0", # Enhanced terminal UX (debugging toolkit)
   # Scientific computing (for SVG)
   "scipy>=1.11.0",
   "scikit-learn>=1.3.0",
@@ -56,7 +56,7 @@ dependencies = [
   "pyswip>=0.3.3", # Python interface to SWI-Prolog for formal logic reasoning
   # HTTP and async
   "aiohttp>=3.12.14",
-  "httpx>=0.27.0,<0.28",  # Constrained by mcp-server-fetch
+  "httpx>=0.27.0,<0.28", # Constrained by mcp-server-fetch
   # Logging and monitoring
   "loguru>=0.7.3",
   "prometheus-client>=0.22.1",

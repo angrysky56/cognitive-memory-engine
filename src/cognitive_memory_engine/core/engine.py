@@ -4,40 +4,37 @@ Core Cognitive Memory Engine
 This module provides the main interface to the Cognitive Memory Engine,
 integrating all components into a unified system.
 
-TODO: DUAL-TRACK ARCHITECTURE IMPLEMENTATION
-===========================================
+DUAL-TRACK ARCHITECTURE IMPLEMENTATION
+=====================================
 
-CURRENT STATE: Only implements Track 1 (Conversation Memory)
-- ✓ store_conversation() works correctly for dialogue narratives
-- ✓ Temporal organization by session/day
-- ✓ RTM trees for conversation compression
+The CME implements a three-track memory architecture:
 
-MISSING IMPLEMENTATION:
-----------------------
+Track 1: Conversation Memory (Implemented)
+- store_conversation() - Stores dialogues as narrative RTM trees
+- Temporal organization by session/day
+- Compression using Random Tree Model
 
-Track 2: Document Knowledge Storage
-- TODO: Add store_document_knowledge(content, root_concept, domain)
-- TODO: Create DocumentRTM with formal knowledge hierarchies
-- TODO: Build structured concept nodes (not conversation nodes)
-- TODO: Root node approach: "SAPE" -> SPL, PKG, SEE, CML, Reflective Controller
+Track 2: Document Knowledge (Implemented)
+- store_document_knowledge() - Stores formal documents as concept hierarchies
+- DocumentRTM with structured knowledge organization
+- Root concept approach with hierarchical breakdown
 
-Track 3: Blended Integration Layer
-- TODO: Add ConceptLink cross-references between tracks
-- TODO: Implement link_conversation_to_knowledge()
-- TODO: Create unified query interface combining both tracks
-- TODO: Cross-reference conversation mentions to formal concepts
+Track 3: Blended Integration (Implemented)
+- link_conversation_to_knowledge() - Creates cross-references
+- query_blended_knowledge() - Unified retrieval interface
+- Cross-reference conversation mentions to formal concepts
 
-Storage Architecture Changes:
-- TODO: Add knowledge_shelves/ directory for domain organization
-- TODO: Create concept-based indexing (not just temporal)
-- TODO: Separate vector stores for conversation vs document knowledge
+Storage Architecture:
+- Conversation trees in rtm_graphs/
+- Document knowledge in document_knowledge/
+- Temporal organization in temporal/
+- Vector embeddings with neural gain modulation
 
-Query Interface Enhancement:
-- TODO: query_blended_knowledge() returning formal + conversational insights
-- TODO: Topic-specific retrieval: get_concept("SAPE")
-- TODO: Domain browsing: browse_shelf(AI_ARCHITECTURE)
-
-PRIORITY: Implement Document Knowledge Track first, then Integration Layer
+Query Interfaces:
+- query_memory() - Search conversation memory
+- get_concept() - Direct concept retrieval
+- browse_knowledge_shelf() - Domain-based browsing
+- query_blended_knowledge() - Unified search across both tracks
 """
 
 import logging
@@ -53,6 +50,7 @@ from ..comprehension.narrative_tree_builder import NarrativeTreeBuilder
 from ..comprehension.temporal_organizer import TemporalOrganizer
 from ..config import get_cloud_provider_config
 from ..production.response_generator import ResponseGenerator
+from ..storage.cross_reference_store import CrossReferenceStore
 from ..storage.document_store import DocumentStore
 from ..storage.rtm_graphs import RTMGraphStore
 from ..storage.temporal_library import TemporalLibrary
@@ -60,6 +58,7 @@ from ..storage.vector_store import VectorStore
 from ..types import (
     ConversationTurn,
     KnowledgeDomain,
+    LinkRelationship,
     NeuralGainConfig,
     RTMConfig,
     SystemConfig,
@@ -127,6 +126,7 @@ class CognitiveMemoryEngine:
         self.temporal_library = TemporalLibrary(str(data_dir / "temporal"))
         self.rtm_store = RTMGraphStore(str(data_dir / "rtm_graphs"))
         self.document_store = DocumentStore(str(data_dir / "document_knowledge"))
+        self.cross_reference_store = CrossReferenceStore(str(data_dir / "cross_references"))
 
         # Get cloud provider configuration
         cloud_config = get_cloud_provider_config()
@@ -356,8 +356,8 @@ class CognitiveMemoryEngine:
             logger.error(f"Error storing conversation: {e}")
             raise CMEError(f"Failed to store conversation: {e}") from e
 
-    # TODO: IMPLEMENT DUAL-TRACK ARCHITECTURE METHODS
-    # ================================================
+    # DUAL-TRACK ARCHITECTURE METHODS
+    # ================================
 
     async def store_document_knowledge(
         self,
@@ -456,7 +456,7 @@ class CognitiveMemoryEngine:
         Create cross-references between conversation and document knowledge.
 
         Analyzes conversation for mentions of formal concepts and creates
-        bidirectional links for blended retrieval.
+        bidirectional links for blended retrieval using semantic similarity.
 
         Args:
             conversation_id: ID of conversation to analyze
@@ -469,23 +469,25 @@ class CognitiveMemoryEngine:
             await self.initialize()
 
         self._ensure_component(self.document_store, "document_store")
+        self._ensure_component(self.cross_reference_store, "cross_reference_store")
 
         logger.info(f"Creating cross-references for conversation {conversation_id}")
 
         try:
+            # Import semantic similarity calculator
+            from ..semantic.similarity_calculator import SemanticSimilarityCalculator
+            similarity_calc = SemanticSimilarityCalculator(self.config.embedding_model)
+
             # Get all document concepts for matching
             all_documents = await self.document_store.get_all_documents()
-            concept_names = []
-            concept_lookup = {}
+            all_concepts = []
 
             for doc in all_documents:
                 for concept_id, concept in doc.concepts.items():
-                    concept_names.append(concept.name)
-                    concept_lookup[concept.name.lower()] = {
-                        'concept_id': concept_id,
-                        'document_id': doc.doc_id,
-                        'concept': concept
-                    }
+                    # Filter by specific concept if requested
+                    if document_concept_id and concept_id != document_concept_id:
+                        continue
+                    all_concepts.append((concept_id, concept))
 
             # Load the conversation RTM tree
             conversation_tree = await self.rtm_store.load_tree(conversation_id)
@@ -493,37 +495,70 @@ class CognitiveMemoryEngine:
                 logger.warning(f"Conversation {conversation_id} not found")
                 return []
 
-            # Analyze conversation nodes for concept mentions
-            links = []
-            # The .nodes attribute is a dict of {node_id: node_object}
+            # Analyze conversation nodes for concept mentions using semantic similarity
+            created_links = []
+
             for node in conversation_tree.nodes.values():
                 if not node or not hasattr(node, 'content') or not hasattr(node, 'node_id'):
                     continue
-                content_lower = node.content.lower()
 
-                # Check for mentions of formal concepts
-                for concept_name in concept_names:
-                    if concept_name.lower() in content_lower:
-                        concept_info = concept_lookup[concept_name.lower()]
+                # Skip very short content
+                if len(node.content) < 10:
+                    continue
 
-                        # Create concept link
-                        link = {
-                            'link_id': f"link_{conversation_id}_{concept_info['concept_id']}",
-                            'conversation_node_id': node.node_id,
-                            'document_concept_id': concept_info['concept_id'],
-                            'document_id': concept_info['document_id'],
-                            'relationship_type': 'discusses',
-                            'confidence_score': 0.8,
-                            'concept_name': concept_name,
-                            'context_snippet': content_lower[:100]
+                # Find semantically similar concepts
+                similar_concepts = similarity_calc.find_similar_concepts(
+                    node.content,
+                    all_concepts,
+                    threshold=0.4  # Minimum similarity threshold
+                )
+
+                # Create links for similar concepts
+                for concept, similarity_score in similar_concepts[:3]:  # Top 3 matches per node
+                    # Determine relationship type based on similarity and content
+                    relationship_type = LinkRelationship.DISCUSSES
+                    if similarity_score > 0.8:
+                        relationship_type = LinkRelationship.ELABORATES
+                    elif "?" in node.content:
+                        relationship_type = LinkRelationship.QUESTIONS
+
+                    # Create ConceptLink object
+                    from ..types import ConceptLink
+                    link = ConceptLink(
+                        conversation_node_id=node.node_id,
+                        conversation_tree_id=conversation_id,
+                        document_concept_id=concept.concept_id,
+                        document_id=concept.concept_id.split('_')[0] if '_' in concept.concept_id else '',
+                        relationship_type=relationship_type,
+                        confidence_score=similarity_score,
+                        context_snippet=node.content[:150] + "..." if len(node.content) > 150 else node.content,
+                        metadata={
+                            'concept_name': concept.name,
+                            'node_type': node.node_type.value,
+                            'node_depth': node.depth
                         }
-                        links.append(link)
+                    )
 
-            logger.info(f"Created {len(links)} cross-reference links")
-            return links
+                    # Persist the link
+                    if await self.cross_reference_store.store_link(link):
+                        # Convert to dict for response
+                        created_links.append({
+                            'link_id': link.link_id,
+                            'conversation_node_id': link.conversation_node_id,
+                            'document_concept_id': link.document_concept_id,
+                            'document_id': link.document_id,
+                            'relationship_type': link.relationship_type.value,
+                            'confidence_score': link.confidence_score,
+                            'concept_name': concept.name,
+                            'context_snippet': link.context_snippet
+                        })
+
+            logger.info(f"Created and persisted {len(created_links)} cross-reference links")
+            return created_links
 
         except Exception as e:
             logger.error(f"Error creating cross-references: {e}")
+            raise CMEError(f"Cross-reference creation failed: {e}") from e
             return []
 
     async def query_blended_knowledge(
@@ -534,6 +569,9 @@ class CognitiveMemoryEngine:
     ) -> dict[str, Any]:
         """
         Unified query interface combining both knowledge tracks.
+
+        Uses semantic similarity for better matching across both
+        conversation and document knowledge.
 
         Returns:
         - formal_knowledge: Structured info from document RTMs
@@ -553,12 +591,13 @@ class CognitiveMemoryEngine:
             await self.initialize()
 
         self._ensure_component(self.document_store, "document_store")
+        self._ensure_component(self.cross_reference_store, "cross_reference_store")
 
         logger.info(f"Blended query: '{query[:50]}...'")
 
         result = {
             'query': query,
-            'formal_knowledge': {},
+            'formal_knowledge': [],
             'conversation_insights': {},
             'cross_references': [],
             'unified_summary': '',
@@ -566,35 +605,40 @@ class CognitiveMemoryEngine:
         }
 
         try:
-            # Track 1: Query formal document knowledge
+            # Import semantic similarity calculator
+            from ..semantic.similarity_calculator import SemanticSimilarityCalculator
+            similarity_calc = SemanticSimilarityCalculator(self.config.embedding_model)
+            # Track 1: Query formal document knowledge with semantic similarity
             if include_formal:
-                # Search for matching concepts
-                if not self.document_store:
-                    raise CMEError("Document store not initialized")
                 all_documents = await self.document_store.get_all_documents()
                 formal_matches = []
 
+                # Collect all concepts with their documents
+                all_concepts = []
                 for doc in all_documents:
                     for concept_id, concept in doc.concepts.items():
-                        # Simple relevance scoring (could be improved with semantic similarity)
-                        concept_text = f"{concept.name} {concept.description}"
-                        query_words = set(query.lower().split())
-                        concept_words = set(concept_text.lower().split())
+                        all_concepts.append((concept, doc))
 
-                        # Calculate overlap score
-                        overlap = len(query_words & concept_words)
-                        if overlap > 0:
-                            formal_matches.append({
-                                'concept_id': concept_id,
-                                'document_id': doc.doc_id,
-                                'concept': concept,
-                                'relevance_score': overlap / len(query_words),
-                                'document_title': doc.root_concept
-                            })
+                # Find semantically similar concepts
+                for concept, doc in all_concepts:
+                    # Calculate semantic similarity
+                    concept_text = f"{concept.name} {concept.description} {concept.content}"
+                    similarity_score = similarity_calc.calculate_similarity(query, concept_text)
+
+                    if similarity_score > 0.3:  # Threshold for relevance
+                        formal_matches.append({
+                            'concept_id': concept.concept_id,
+                            'document_id': doc.doc_id,
+                            'concept': concept,
+                            'relevance_score': similarity_score,
+                            'document_title': doc.root_concept,
+                            'concept_name': concept.name,
+                            'description': concept.description[:200] + "..." if len(concept.description) > 200 else concept.description
+                        })
 
                 # Sort by relevance and take top matches
                 formal_matches.sort(key=lambda x: x['relevance_score'], reverse=True)
-                result['formal_knowledge'] = formal_matches[:3]
+                result['formal_knowledge'] = formal_matches[:5]
 
             # Track 2: Query conversation memory
             if include_conversational:
@@ -610,29 +654,42 @@ class CognitiveMemoryEngine:
                     'total_results': conversation_results.get('total_results', 0)
                 }
 
-            # Track 3: Find cross-references
-            if include_formal and include_conversational:
-                if result['formal_knowledge'] and result['conversation_insights']['results']:
-                    # Find potential cross-references between formal concepts and conversation
-                    for formal_match in result['formal_knowledge']:
-                        concept_name = formal_match['concept'].name
+            # Track 3: Retrieve persisted cross-references
+            if result['formal_knowledge'] or result['conversation_insights']['results']:
+                # Get all cross-references with high confidence
+                all_links = await self.cross_reference_store.get_all_links(min_confidence=0.5)
 
-                        for conv_result in result['conversation_insights']['results']:
-                            if concept_name.lower() in conv_result.get('content', '').lower():
-                                result['cross_references'].append({
-                                    'formal_concept': concept_name,
-                                    'conversation_fragment': conv_result.get('content', '')[:100],
-                                    'relationship': 'mentions',
-                                    'confidence': 0.7
-                                })
+                # Filter links relevant to our query results
+                relevant_links = []
+
+                # Check formal knowledge matches
+                for match in result['formal_knowledge']:
+                    concept_id = match['concept_id']
+                    # Find links for this concept
+                    concept_links = [link for link in all_links if link.document_concept_id == concept_id]
+
+                    for link in concept_links[:2]:  # Top 2 links per concept
+                        relevant_links.append({
+                            'link_id': link.link_id,
+                            'formal_concept': match['concept_name'],
+                            'conversation_fragment': link.context_snippet,
+                            'relationship': link.relationship_type.value,
+                            'confidence': link.confidence_score,
+                            'conversation_id': link.conversation_tree_id
+                        })
+
+                # Sort by confidence and limit
+                relevant_links.sort(key=lambda x: x['confidence'], reverse=True)
+                result['cross_references'] = relevant_links[:10]
 
             # Generate unified summary
             summary_parts = []
 
             if result['formal_knowledge']:
                 formal_summary = f"Formal knowledge: Found {len(result['formal_knowledge'])} relevant concepts"
-                top_concept = result['formal_knowledge'][0]['concept']
-                formal_summary += f" including '{top_concept.name}': {top_concept.description[:100]}..."
+                if result['formal_knowledge']:
+                    top_concept = result['formal_knowledge'][0]
+                    formal_summary += f" including '{top_concept['concept_name']}' (relevance: {top_concept['relevance_score']:.2f})"
                 summary_parts.append(formal_summary)
 
             if result['conversation_insights']['results']:
@@ -646,10 +703,10 @@ class CognitiveMemoryEngine:
 
             result['unified_summary'] = '. '.join(summary_parts) if summary_parts else "No relevant knowledge found"
 
-            # Calculate overall confidence
-            formal_confidence = 0.8 if result['formal_knowledge'] else 0.0
+            # Calculate overall confidence using semantic scores
+            formal_confidence = max([m['relevance_score'] for m in result['formal_knowledge']], default=0.0)
             conv_confidence = 0.6 if result['conversation_insights']['results'] else 0.0
-            cross_confidence = 0.9 if result['cross_references'] else 0.0
+            cross_confidence = max([l['confidence'] for l in result['cross_references']], default=0.0)
 
             result['confidence_score'] = max(formal_confidence, conv_confidence, cross_confidence)
 
@@ -1194,6 +1251,10 @@ class CognitiveMemoryEngine:
                 # Document store doesn't have async cleanup, but we can clear caches
                 self.document_store.documents.clear()
                 self.document_store.shelves.clear()
+
+            if self.cross_reference_store:
+                # Cross-reference store cleanup
+                self.cross_reference_store.links.clear()
 
             self.active_sessions.clear()
             self.initialized = False

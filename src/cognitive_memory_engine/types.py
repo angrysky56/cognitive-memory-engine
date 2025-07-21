@@ -401,11 +401,12 @@ class ConceptLink:
     # Relationship information
     relationship_type: LinkRelationship = LinkRelationship.DISCUSSES
     confidence_score: float = 0.5
-    context: str = ""  # Where/how the link was identified
+    context_snippet: str = ""  # Snippet of conversation text where link was found
 
     # Metadata
     created: datetime = field(default_factory=datetime.now)
     validated: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -453,3 +454,79 @@ class BlendedQueryResult:
     # Processing info
     timestamp: datetime = field(default_factory=datetime.now)
     processing_time_ms: int = 0
+
+
+# =============================================================================
+# LOGICAL QUERY PROCESSING DATA STRUCTURES
+# =============================================================================
+
+class QueryMode(Enum):
+    """Query execution modes for logical processing"""
+    PROLOG = "prolog"
+    VECTOR = "vector"
+    GRAPH = "graph"
+    HYBRID = "hybrid"
+    SEMANTIC = "semantic"
+
+
+@dataclass
+class QueryContext:
+    """Context information for query processing"""
+    query_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    user_query: str = ""
+    query_mode: QueryMode = QueryMode.HYBRID
+
+    # Context parameters
+    max_results: int = 10
+    similarity_threshold: float = 0.7
+    temporal_scope: str | None = None
+    domain_filter: KnowledgeDomain | None = None
+
+    # Processing preferences
+    include_explanations: bool = True
+    enable_reasoning: bool = True
+    cache_results: bool = True
+
+    # Metadata
+    session_id: str = ""
+    timestamp: datetime = field(default_factory=datetime.now)
+    user_metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class LogicalResult:
+    """Result from logical query processing"""
+    result_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    query_context: QueryContext | None = None
+
+    # Result data
+    success: bool = True
+    data: dict[str, Any] = field(default_factory=dict)
+    solutions: list[dict[str, Any]] = field(default_factory=list)
+
+    # Logical reasoning
+    proof_trace: list[str] = field(default_factory=list)
+    reasoning_steps: list[str] = field(default_factory=list)
+    confidence_score: float = 1.0
+
+    # Query execution metadata
+    execution_time_ms: int = 0
+    query_mode_used: QueryMode = QueryMode.HYBRID
+    sources_consulted: list[str] = field(default_factory=list)
+
+    # Error handling
+    error_message: str | None = None
+    warnings: list[str] = field(default_factory=list)
+
+    # Temporal information
+    timestamp: datetime = field(default_factory=datetime.now)
+
+    def is_successful(self) -> bool:
+        """Check if the query was successful"""
+        return self.success and not self.error_message
+
+    def get_primary_solution(self) -> dict[str, Any] | None:
+        """Get the highest confidence solution"""
+        if not self.solutions:
+            return None
+        return max(self.solutions, key=lambda x: x.get('confidence', 0.0))

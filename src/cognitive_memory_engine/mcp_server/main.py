@@ -294,9 +294,40 @@ async def handle_read_resource(uri: AnyUrl) -> str:
             return json.dumps(all_concepts_summary, indent=2, default=str)
 
         elif uri == "cme://memory/cross_references":
-            # TODO: Implement retrieval of cross-references
-            cross_refs = {"status": "not_implemented", "message": "Retrieval of cross-references is not yet implemented."}
-            return json.dumps(cross_refs, indent=2)
+            # Retrieve all cross-references from the store
+            cross_refs_data = {
+                "cross_references": [],
+                "statistics": {},
+                "status": "success"
+            }
+
+            if cme.cross_reference_store:
+                # Get all links with minimum confidence
+                all_links = await cme.cross_reference_store.get_all_links(min_confidence=0.3)
+
+                # Convert to serializable format
+                for link in all_links[:50]:  # Limit to 50 for performance
+                    cross_refs_data["cross_references"].append({
+                        "link_id": link.link_id,
+                        "conversation_tree_id": link.conversation_tree_id,
+                        "conversation_node_id": link.conversation_node_id,
+                        "document_concept_id": link.document_concept_id,
+                        "document_id": link.document_id,
+                        "relationship_type": link.relationship_type.value,
+                        "confidence_score": link.confidence_score,
+                        "context_snippet": link.context_snippet,
+                        "created": link.created.isoformat(),
+                        "metadata": link.metadata
+                    })
+
+                # Get statistics
+                stats = cme.cross_reference_store.get_statistics()
+                cross_refs_data["statistics"] = stats
+            else:
+                cross_refs_data["status"] = "error"
+                cross_refs_data["message"] = "Cross-reference store not initialized"
+
+            return json.dumps(cross_refs_data, indent=2, default=str)
 
         elif uri == "cme://memory/narratives":
             narratives = await cme.get_narrative_summaries()

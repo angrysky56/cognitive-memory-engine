@@ -32,5 +32,6 @@ __all__ = [
     "QueryExecutionError",
 ]
 from .logical_query_processor import LogicalQueryProcessor, LQEPRResult
+from .similarity_calculator import SemanticSimilarityCalculator
 
-__all__ = ['LogicalQueryProcessor', 'LQEPRResult']
+__all__ = ['LogicalQueryProcessor', 'LQEPRResult', 'SemanticSimilarityCalculator']
