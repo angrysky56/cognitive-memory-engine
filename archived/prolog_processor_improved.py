@@ -14,7 +14,6 @@ Key Improvements:
 - Zero breaking changes for existing code
 """
 
-import json
 import logging
 import re
 from dataclasses import dataclass
@@ -36,7 +35,6 @@ except ImportError:
 from .abstract_processors import (
     AbstractSemanticProcessor,
     LogicalForm,
-    SemanticProcessingError,
     SemanticResult,
 )
 

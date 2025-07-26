@@ -43,12 +43,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from cognitive_memory_engine.mcp_server.enhanced_server_tools import EnhancedKnowledgeServerTools
+    from cognitive_memory_engine.mcp_server.enhanced_server_tools import (
+        EnhancedKnowledgeServerTools,
+    )
 
 from ..comprehension.document_knowledge_builder import DocumentKnowledgeBuilder
 from ..comprehension.narrative_tree_builder import NarrativeTreeBuilder
 from ..comprehension.temporal_organizer import TemporalOrganizer
-from ..config import get_cloud_provider_config
+from ..list_models import get_cloud_provider_config
 from ..production.response_generator import ResponseGenerator
 from ..storage.cross_reference_store import CrossReferenceStore
 from ..storage.document_store import DocumentStore
@@ -616,7 +618,7 @@ class CognitiveMemoryEngine:
                 # Collect all concepts with their documents
                 all_concepts = []
                 for doc in all_documents:
-                    for concept_id, concept in doc.concepts.items():
+                    for _concept_id, concept in doc.concepts.items():
                         all_concepts.append((concept, doc))
 
                 # Find semantically similar concepts
@@ -706,7 +708,7 @@ class CognitiveMemoryEngine:
             # Calculate overall confidence using semantic scores
             formal_confidence = max([m['relevance_score'] for m in result['formal_knowledge']], default=0.0)
             conv_confidence = 0.6 if result['conversation_insights']['results'] else 0.0
-            cross_confidence = max([l['confidence'] for l in result['cross_references']], default=0.0)
+            cross_confidence = max([link['confidence'] for link in result['cross_references']], default=0.0)
 
             result['confidence_score'] = max(formal_confidence, conv_confidence, cross_confidence)
 

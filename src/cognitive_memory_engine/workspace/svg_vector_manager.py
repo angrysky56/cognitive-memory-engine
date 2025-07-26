@@ -13,7 +13,14 @@ from typing import Any
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from ..types import ConversationTurn, NeuralGainConfig, RTMNode, RTMTree, TemporalBook, TemporalScale
+from ..types import (
+    ConversationTurn,
+    NeuralGainConfig,
+    RTMNode,
+    RTMTree,
+    TemporalBook,
+    TemporalScale,
+)
 from .svg_memory_index import SVGMemoryIndex
 
 logger = logging.getLogger(__name__)

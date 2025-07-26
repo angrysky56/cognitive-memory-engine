@@ -9,7 +9,6 @@ This tests the enhanced store_document_knowledge MCP tool that now supports:
 """
 
 import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -17,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from cognitive_memory_engine.mcp_server.main import handle_call_tool, initialize_engine
-from cognitive_memory_engine.config import load_env_config
+
 
 async def test_enhanced_store_document():
     """Test the enhanced store_document_knowledge functionality."""
@@ -44,7 +43,7 @@ async def test_enhanced_store_document():
         }
 
         result1 = await handle_call_tool("store_document_knowledge", test1_args)
-        print(f"✅ Traditional storage successful")
+        print("✅ Traditional storage successful")
         print(f"Response: {result1[0].text[:100]}...")
 
         # Test 2: Enhanced with fetch context (without URL)
@@ -61,7 +60,7 @@ async def test_enhanced_store_document():
         }
 
         result2 = await handle_call_tool("store_document_knowledge", test2_args)
-        print(f"✅ Fetch-enhanced storage successful")
+        print("✅ Fetch-enhanced storage successful")
         print(f"Response: {result2[0].text[:100]}...")
 
         # Test 3: Mock URL fetching (simulated)
@@ -88,7 +87,7 @@ async def test_enhanced_store_document():
         }
 
         result4 = await handle_call_tool("store_document_knowledge", test4_args)
-        print(f"✅ Error handling working correctly")
+        print("✅ Error handling working correctly")
         print(f"Error response: {result4[0].text[:100]}...")
 
         print("\n🎉 All Tests Completed!")

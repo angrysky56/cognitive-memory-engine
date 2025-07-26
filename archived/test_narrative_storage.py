@@ -2,20 +2,21 @@
 """Test script to store the Intelligent Workspace narrative using the cognitive memory engine."""
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from cognitive_memory_engine import CognitiveMemoryEngine
 
+
 async def store_intelligent_workspace_narrative():
     """Store the Intelligent Workspace narrative in the cognitive memory engine."""
-    
+
     # Initialize the engine
     engine = CognitiveMemoryEngine()
-    
+
     # Define the conversation about the Intelligent Workspace
     conversation = [
         {
@@ -23,7 +24,7 @@ async def store_intelligent_workspace_narrative():
             "content": "Research documentation on the Intelligent Workspace unified memory architecture - a groundbreaking AI memory system that combines Random Tree Model hierarchical storage with Dynamic Working Memory management."
         },
         {
-            "role": "assistant", 
+            "role": "assistant",
             "content": "The Intelligent Workspace represents a unified AI memory model that synthesizes two complementary cognitive architectures into a powerful, human-like memory system. This architecture consists of two integrated components that work together seamlessly."
         },
         {
@@ -35,7 +36,7 @@ async def store_intelligent_workspace_narrative():
             "content": "The Long-Term Store uses the Random Tree Model as the foundational storage architecture. This is the brain's elegant solution for compressing and organizing vast amounts of narrative information, functioning like a comprehensive library. The AI's entire knowledge base - every document read, conversation held, and experience gained - is encoded into a massive forest of Random Trees. Each tree uses hierarchical summarization with high-level summaries at the root branching down to progressively more detailed sub-plots and individual events, with the finest details at the leaves. This structure enables highly efficient access to information at any level of abstraction, from high-level gist to verbatim details, without processing entire documents."
         },
         {
-            "role": "system", 
+            "role": "system",
             "content": "Part 2: The Active Workspace - Dynamic Memory Manager"
         },
         {
@@ -47,37 +48,37 @@ async def store_intelligent_workspace_narrative():
             "content": "Breakthrough Capabilities and Implementation"
         },
         {
-            "role": "assistant", 
+            "role": "assistant",
             "content": "This unified architecture creates capabilities that surpass traditional AI limitations: immunity to interference (maintains long complex conversations without older information disrupting new understanding), deep multi-step reasoning (tackles problems requiring integration of diverse high-level knowledge), true contextual understanding (recognizes that information meaning changes based on current goals), and massive computational efficiency (processes small, highly-relevant, prioritized information sets rather than large passive text blocks). The system essentially creates both a vast, well-organized knowledge library and a brilliant, focused librarian that knows exactly what to retrieve and arrange for any given task. Technical implementation involves using sentence transformers for embeddings, ChromaDB for vector storage, NetworkX for Random Tree graph structures, and neural gain magnitude encoding for salience-weighted retrieval."
         }
     ]
-    
+
     # Context for the conversation
     context = {
         "topic": "Intelligent Workspace Unified Memory Architecture",
         "importance": 0.95,
-        "domain": "AI Memory Systems", 
+        "domain": "AI Memory Systems",
         "research_phase": "architecture_design",
         "participants": ["Research Team", "AI System"]
     }
-    
+
     try:
         # Store the conversation
         print("Storing Intelligent Workspace narrative...")
         result = await engine.store_conversation(conversation, context)
-        print(f"✅ Narrative stored successfully!")
+        print("✅ Narrative stored successfully!")
         print(f"Result: {result}")
-        
+
         # Get memory stats
         print("\nMemory statistics:")
         stats = await engine.get_memory_stats()
         print(f"Stats: {stats}")
-        
+
         # Test retrieval
         print("\nTesting retrieval...")
         response = await engine.query_memory("What is the Intelligent Workspace architecture?")
         print(f"Query response: {response}")
-        
+
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback

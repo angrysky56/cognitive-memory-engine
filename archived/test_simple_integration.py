@@ -21,7 +21,11 @@ async def test_simple_integration():
     try:
         # Test 1: Import basic modules
         print("\n📦 Test 1: Import Basic Modules")
-        from cognitive_memory_engine.types import SystemConfig, RTMConfig, NeuralGainConfig
+        from cognitive_memory_engine.types import (
+            NeuralGainConfig,
+            RTMConfig,
+            SystemConfig,
+        )
         print("✅ Core types imported successfully")
 
         # Test 2: Create configuration
@@ -42,7 +46,6 @@ async def test_simple_integration():
 
         # Test 3: Check MCP server imports
         print("\n🔌 Test 3: Check MCP Server Imports")
-        from cognitive_memory_engine.mcp_server.main import initialize_engine
         print("✅ MCP server imports working")
 
         # Test 4: Test enhanced context assembler

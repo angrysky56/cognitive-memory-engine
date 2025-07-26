@@ -22,7 +22,10 @@ try:
 except ImportError:
     console = None
 
-from src.cognitive_memory_engine.semantic.logical_query_processor import LogicalQueryProcessor, LQEPRResult
+from src.cognitive_memory_engine.semantic.logical_query_processor import (
+    LogicalQueryProcessor,
+    LQEPRResult,
+)
 from src.cognitive_memory_engine.types import QueryMode
 
 
@@ -39,7 +42,7 @@ def print_status(message: str, status: str = "INFO"):
 async def test_lqepr_initialization():
     """Test LQEPR processor initialization"""
     print_status("Testing LogicalQueryProcessor initialization...")
-    
+
     try:
         # Test initialization with None components (graceful degradation)
         processor = LogicalQueryProcessor(
@@ -48,16 +51,16 @@ async def test_lqepr_initialization():
             vector_store=None,
             config={'enable_caching': True}
         )
-        
+
         # Verify initialization
         assert processor.modes_available[QueryMode.LOGICAL] == False
-        assert processor.modes_available[QueryMode.GRAPH] == False  
+        assert processor.modes_available[QueryMode.GRAPH] == False
         assert processor.modes_available[QueryMode.VECTOR] == False
         assert processor.cache_enabled == True
-        
+
         print_status("Initialization test passed", "PASS")
         return True
-        
+
     except Exception as e:
         print_status(f"Initialization test failed: {e}", "FAIL")
         return False
@@ -66,17 +69,17 @@ async def test_lqepr_initialization():
 async def test_unified_query():
     """Test unified query execution with graceful degradation"""
     print_status("Testing unified query with no backends...")
-    
+
     try:
         processor = LogicalQueryProcessor()
-        
+
         # This should handle gracefully when no backends available
         result = await processor.unified_query(
             query_text="Test query for Phase 3B-2 verification",
             max_results=5,
             show_progress=False
         )
-        
+
         # Verify result structure
         assert isinstance(result, LQEPRResult)
         assert result.query_text == "Test query for Phase 3B-2 verification"
@@ -85,10 +88,10 @@ async def test_unified_query():
         assert isinstance(result.graph_results, list)
         assert isinstance(result.vector_results, list)
         assert isinstance(result.execution_time, float)
-        
+
         print_status("Unified query test passed", "PASS")
         return True
-        
+
     except Exception as e:
         print_status(f"Unified query test failed: {e}", "FAIL")
         return False
@@ -97,10 +100,10 @@ async def test_unified_query():
 async def test_result_display():
     """Test result display with rich formatting"""
     print_status("Testing result display capabilities...")
-    
+
     try:
         processor = LogicalQueryProcessor()
-        
+
         # Create mock result
         result = LQEPRResult(
             query_text="Test display query",
@@ -113,20 +116,20 @@ async def test_result_display():
             execution_time=0.234,
             query_metadata={"test": True}
         )
-        
+
         # Test display (should not raise errors)
         processor.display_results(result, detailed=True)
-        
+
         # Test rich table creation
         table = result.to_rich_table()
         if console and table:
             print_status("Rich table creation successful", "PASS")
         elif not console:
             print_status("Rich not available - using fallback display", "WARN")
-        
+
         print_status("Result display test passed", "PASS")
         return True
-        
+
     except Exception as e:
         print_status(f"Result display test failed: {e}", "FAIL")
         return False
@@ -135,27 +138,27 @@ async def test_result_display():
 async def test_stats_and_monitoring():
     """Test statistics and monitoring functionality"""
     print_status("Testing stats and monitoring...")
-    
+
     try:
         processor = LogicalQueryProcessor()
-        
+
         # Get initial stats
         stats = processor.get_stats()
-        
+
         # Verify stats structure
-        required_keys = ['total_queries', 'avg_execution_time', 'mode_usage', 
+        required_keys = ['total_queries', 'avg_execution_time', 'mode_usage',
                         'cache_hits', 'available_modes', 'cache_enabled', 'cache_size']
-        
+
         for key in required_keys:
             assert key in stats, f"Missing stats key: {key}"
-        
+
         # Verify mode usage has all modes
         for mode in QueryMode:
             assert mode in stats['mode_usage'], f"Missing mode in stats: {mode}"
-        
+
         print_status("Stats and monitoring test passed", "PASS")
         return True
-        
+
     except Exception as e:
         print_status(f"Stats test failed: {e}", "FAIL")
         return False
@@ -164,20 +167,20 @@ async def test_stats_and_monitoring():
 async def test_cli_integration():
     """Test CLI components"""
     print_status("Testing CLI integration...")
-    
+
     try:
         # Test CLI imports
-        from src.cognitive_memory_engine.cli.lqepr_commands import app, main
-        
+        from src.cognitive_memory_engine.cli.lqepr_commands import app
+
         # Verify CLI app exists
         if app:
             print_status("CLI app created successfully", "PASS")
         else:
             print_status("CLI requires typer (graceful fallback)", "WARN")
-        
+
         print_status("CLI integration test passed", "PASS")
         return True
-        
+
     except Exception as e:
         print_status(f"CLI integration test failed: {e}", "FAIL")
         return False
@@ -195,7 +198,7 @@ async def main():
     else:
         print("Phase 3B-2 LQEPR Verification")
         print("=" * 40)
-    
+
     # Run all tests
     tests = [
         test_lqepr_initialization,
@@ -204,7 +207,7 @@ async def main():
         test_stats_and_monitoring,
         test_cli_integration
     ]
-    
+
     results = []
     for test_func in tests:
         try:
@@ -213,31 +216,31 @@ async def main():
         except Exception as e:
             print_status(f"Test {test_func.__name__} crashed: {e}", "FAIL")
             results.append(False)
-    
+
     # Summary
     passed = sum(results)
     total = len(results)
-    
+
     if console:
         # Rich summary table
         table = Table(title="Verification Results")
         table.add_column("Component", style="cyan")
         table.add_column("Status", justify="center")
-        
+
         test_names = [
             "Initialization",
             "Unified Query",
-            "Result Display", 
+            "Result Display",
             "Stats & Monitoring",
             "CLI Integration"
         ]
-        
-        for name, result in zip(test_names, results):
+
+        for name, result in zip(test_names, results, strict=False):
             status = "[green]✓ PASS[/green]" if result else "[red]✗ FAIL[/red]"
             table.add_row(name, status)
-        
+
         console.print(table)
-        
+
         # Final status
         if passed == total:
             console.print(Panel(

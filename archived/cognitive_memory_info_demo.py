@@ -12,7 +12,6 @@ Shows the complete system working with genuine scientific knowledge!
 """
 
 import asyncio
-import json
 import sys
 import uuid
 from datetime import datetime

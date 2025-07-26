@@ -3,8 +3,8 @@
 Debug initialization to trace missing component connections
 """
 import asyncio
-import sys
 import logging
+import sys
 import traceback
 from pathlib import Path
 
@@ -20,7 +20,10 @@ logging.basicConfig(
 async def debug_initialization():
     try:
         print("=== STEP 1: Import config ===")
-        from cognitive_memory_engine.config import load_env_config, get_cloud_provider_config
+        from cognitive_memory_engine.config import (
+            get_cloud_provider_config,
+            load_env_config,
+        )
         print("✓ Config imports successful")
 
         print("=== STEP 2: Load config ===")
@@ -38,7 +41,7 @@ async def debug_initialization():
         engine = CognitiveMemoryEngine(config)
         print("✓ Engine created")
 
-        print(f"Initial component states:")
+        print("Initial component states:")
         print(f"  narrative_builder: {engine.narrative_builder}")
         print(f"  document_builder: {engine.document_builder}")
         print(f"  vector_manager: {engine.vector_manager}")
@@ -57,17 +60,27 @@ async def debug_initialization():
         print(f"✓ Data directory: {data_dir}")
 
         print("Testing component imports...")
-        from cognitive_memory_engine.storage.vector_store import VectorStore
-        from cognitive_memory_engine.storage.temporal_library import TemporalLibrary
-        from cognitive_memory_engine.storage.rtm_graphs import RTMGraphStore
+        from cognitive_memory_engine.comprehension.document_knowledge_builder import (
+            DocumentKnowledgeBuilder,
+        )
+        from cognitive_memory_engine.comprehension.narrative_tree_builder import (
+            NarrativeTreeBuilder,
+        )
+        from cognitive_memory_engine.comprehension.temporal_organizer import (
+            TemporalOrganizer,
+        )
+        from cognitive_memory_engine.production.response_generator import (
+            ResponseGenerator,
+        )
         from cognitive_memory_engine.storage.document_store import DocumentStore
-        from cognitive_memory_engine.comprehension.document_knowledge_builder import DocumentKnowledgeBuilder
-        from cognitive_memory_engine.comprehension.narrative_tree_builder import NarrativeTreeBuilder
-        from cognitive_memory_engine.comprehension.temporal_organizer import TemporalOrganizer
-        from cognitive_memory_engine.workspace.vector_manager import VectorManager
-        from cognitive_memory_engine.workspace.svg_vector_manager import SVGVectorManager
+        from cognitive_memory_engine.storage.rtm_graphs import RTMGraphStore
+        from cognitive_memory_engine.storage.temporal_library import TemporalLibrary
+        from cognitive_memory_engine.storage.vector_store import VectorStore
         from cognitive_memory_engine.workspace.context_assembler import ContextAssembler
-        from cognitive_memory_engine.production.response_generator import ResponseGenerator
+        from cognitive_memory_engine.workspace.svg_vector_manager import (
+            SVGVectorManager,
+        )
+        from cognitive_memory_engine.workspace.vector_manager import VectorManager
         print("✓ All component imports successful")
 
         print("Testing component creation step by step...")
@@ -195,7 +208,7 @@ async def debug_initialization():
         print("Now testing actual engine initialization...")
         await engine.initialize()
 
-        print(f"After engine.initialize() component states:")
+        print("After engine.initialize() component states:")
         print(f"  narrative_builder: {engine.narrative_builder}")
         print(f"  document_builder: {engine.document_builder}")
         print(f"  vector_manager: {engine.vector_manager}")

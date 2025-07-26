@@ -23,8 +23,8 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-  # MCP Server and Data Ingestion (Core functionality)
-  "mcp[cli]>=1.2.0",
+  # MCP Server and Data Ingestion (Core functionality) - UPDATED to latest
+  "mcp[cli]>=1.12.2",  # Latest stable version as of July 2025
   "mcp-server-fetch>=2025.4.7", # Core dependency for data ingestion
   # Core dependencies
   "fastapi>=0.116.1",

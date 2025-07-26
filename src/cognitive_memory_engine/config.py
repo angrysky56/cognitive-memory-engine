@@ -30,7 +30,7 @@ except ImportError:
     pass
 from pathlib import Path
 
-from .types import NeuralGainConfig, RTMConfig, SystemConfig, TemporalScale
+from .types import NeuralGainConfig, RTMConfig, SystemConfig
 
 
 @dataclass
@@ -65,20 +65,15 @@ def load_env_config() -> SystemConfig:
 
     if provider == "ollama":
         model = os.getenv("OLLAMA_MODEL", "phi4-mini:latest")
-        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     elif provider == "openai":
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
     elif provider == "anthropic":
         model = os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
-        base_url = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
     elif provider == "google":
         model = os.getenv("GOOGLE_MODEL", "gemini-2.0-flash-lite")
-        base_url = os.getenv("GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1")
     else:
         # Fallback to Ollama
         model = os.getenv("OLLAMA_MODEL", "phi4-mini:latest")
-        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
     # Embedding model
     embedding_model = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")

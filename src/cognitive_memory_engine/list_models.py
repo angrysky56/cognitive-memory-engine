@@ -7,7 +7,6 @@ Usage:
 """
 
 import asyncio
-import os
 import sys
 from pathlib import Path
 
@@ -15,7 +14,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from cognitive_memory_engine.config import get_cloud_provider_config
-from cognitive_memory_engine.llm_providers import LLMProviderFactory, list_all_available_models
+from cognitive_memory_engine.llm_providers import (
+    LLMProviderFactory,
+    list_all_available_models,
+)
 
 
 async def main():

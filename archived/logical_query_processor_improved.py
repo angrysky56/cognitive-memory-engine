@@ -14,7 +14,6 @@ Key Improvements:
 - Complete implementation of all NotImplementedError methods
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -42,7 +41,7 @@ except ImportError:
 from ..storage.semantic_graph_store import SemanticGraphStore
 from ..storage.vector_store import VectorStore
 from ..types import LogicalResult, QueryMode
-from .abstract_processors import AbstractQueryEngine, QueryExecutionError
+from .abstract_processors import AbstractQueryEngine
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,6 @@ This is part of the Active Workspace - the bridge between long-term memory
 and short-term response generation.
 """
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Any

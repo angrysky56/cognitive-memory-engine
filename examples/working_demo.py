@@ -13,16 +13,13 @@ Run this after setting up Ollama with: ollama pull qwen2.5:7b
 
 import asyncio
 import sys
-import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from cognitive_memory_engine import (
-    CognitiveMemoryEngine, ConversationTurn, MemoryQuery
-)
+from cognitive_memory_engine import CognitiveMemoryEngine, ConversationTurn, MemoryQuery
 
 
 async def demo_cognitive_memory_engine():

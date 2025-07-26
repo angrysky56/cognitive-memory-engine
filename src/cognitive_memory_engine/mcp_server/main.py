@@ -13,6 +13,7 @@ import logging
 import signal
 import sys
 from datetime import datetime
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 import mcp.server.stdio
@@ -27,7 +28,9 @@ from ..core.exceptions import CMEError
 from ..task_manager import create_immediate_response, task_manager
 
 if TYPE_CHECKING:
-    from cognitive_memory_engine.mcp_server.enhanced_server_tools import EnhancedKnowledgeServerTools
+    from cognitive_memory_engine.mcp_server.enhanced_server_tools import (
+        EnhancedKnowledgeServerTools,
+    )
 
 # Configure logging to stderr for MCP servers
 logging.basicConfig(
@@ -36,6 +39,40 @@ logging.basicConfig(
     stream=sys.stderr
 )
 logger = logging.getLogger(__name__)
+
+
+def serialize_complex_objects(obj):
+    """
+    Custom JSON serialization function to handle complex objects
+    that can't be serialized by default json.dumps()
+    """
+    try:
+        # Handle Pydantic AnyUrl objects
+        if isinstance(obj, AnyUrl):
+            return str(obj)
+
+        # Handle datetime objects
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+
+        # Handle Enum objects
+        if isinstance(obj, Enum):
+            return obj.value
+
+        # Handle objects with dict() method (Pydantic models)
+        if hasattr(obj, 'dict') and callable(obj.dict):
+            return obj.dict()
+
+        # Handle objects with __dict__ attribute
+        if hasattr(obj, '__dict__'):
+            return {k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
+
+        # Fallback to string representation
+        return str(obj)
+
+    except Exception as e:
+        logger.warning(f"Failed to serialize object {type(obj)}: {e}")
+        return str(obj)
 
 # Enhanced Knowledge Tools Integration
 enhanced_tools_available = False
@@ -50,7 +87,9 @@ def import_enhanced_tools():
         if enhanced_tools_path.exists():
             import sys
             sys.path.insert(0, str(enhanced_tools_path))
-            from cognitive_memory_engine.mcp_server.enhanced_server_tools import EnhancedKnowledgeServerTools
+            from cognitive_memory_engine.mcp_server.enhanced_server_tools import (
+                EnhancedKnowledgeServerTools,
+            )
             enhanced_tools_available = True
             logger.info("Enhanced knowledge tools imported successfully")
             return EnhancedKnowledgeServerTools
@@ -259,11 +298,14 @@ async def handle_read_resource(uri: AnyUrl) -> str:
     try:
         cme = await initialize_engine()
 
-        if uri == "cme://memory/conversations":
-            conversations = await cme.get_recent_conversations(limit=10)
-            return json.dumps(conversations, indent=2, default=str)
+        # Convert AnyUrl to string for comparison
+        uri_str = str(uri)
 
-        elif uri == "cme://memory/documents":
+        if uri_str == "cme://memory/conversations":
+            conversations = await cme.get_recent_conversations(limit=10)
+            return json.dumps(conversations, indent=2, default=serialize_complex_objects)
+
+        elif uri_str == "cme://memory/documents":
             all_docs_summary = []
             if cme.document_store:
                 all_docs = await cme.document_store.get_all_documents()
@@ -276,9 +318,9 @@ async def handle_read_resource(uri: AnyUrl) -> str:
                         "total_concepts": doc.total_concepts,
                         "created": doc.created.isoformat(),
                     })
-            return json.dumps(all_docs_summary, indent=2, default=str)
+            return json.dumps(all_docs_summary, indent=2, default=serialize_complex_objects)
 
-        elif uri == "cme://memory/concepts":
+        elif uri_str == "cme://memory/concepts":
             all_concepts_summary = []
             if cme.document_store:
                 all_docs = await cme.document_store.get_all_documents()
@@ -291,9 +333,9 @@ async def handle_read_resource(uri: AnyUrl) -> str:
                             "document_id": doc.doc_id,
                             "domain": doc.domain.value,
                         })
-            return json.dumps(all_concepts_summary, indent=2, default=str)
+            return json.dumps(all_concepts_summary, indent=2, default=serialize_complex_objects)
 
-        elif uri == "cme://memory/cross_references":
+        elif uri_str == "cme://memory/cross_references":
             # Retrieve all cross-references from the store
             cross_refs_data = {
                 "cross_references": [],
@@ -327,34 +369,34 @@ async def handle_read_resource(uri: AnyUrl) -> str:
                 cross_refs_data["status"] = "error"
                 cross_refs_data["message"] = "Cross-reference store not initialized"
 
-            return json.dumps(cross_refs_data, indent=2, default=str)
+            return json.dumps(cross_refs_data, indent=2, default=serialize_complex_objects)
 
-        elif uri == "cme://memory/narratives":
+        elif uri_str == "cme://memory/narratives":
             narratives = await cme.get_narrative_summaries()
-            return json.dumps(narratives, indent=2, default=str)
+            return json.dumps(narratives, indent=2, default=serialize_complex_objects)
 
-        elif uri == "cme://memory/temporal":
+        elif uri_str == "cme://memory/temporal":
             temporal_data = await cme.get_temporal_organization()
-            return json.dumps(temporal_data, indent=2, default=str)
+            return json.dumps(temporal_data, indent=2, default=serialize_complex_objects)
 
-        elif uri == "cme://memory/context":
+        elif uri_str == "cme://memory/context":
             context = await cme.get_active_context()
-            return json.dumps(context, indent=2, default=str)
+            return json.dumps(context, indent=2, default=serialize_complex_objects)
 
-        elif uri == "cme://memory/vector_store":
+        elif uri_str == "cme://memory/vector_store":
             stats = await cme.get_memory_stats(include_details=True)
             vector_store_details = stats.get("vector_store", {})
-            return json.dumps(vector_store_details, indent=2, default=str)
+            return json.dumps(vector_store_details, indent=2, default=serialize_complex_objects)
 
         else:
-            raise ValueError(f"Unknown resource URI: {uri}")
+            raise ValueError(f"Unknown resource URI: {uri_str}")
 
     except Exception as e:
         logger.error(f"Error reading resource {uri}: {e}")
         error_response = {
             "error": str(e),
-            "uri": uri,
-            "timestamp": asyncio.get_event_loop().time()
+            "uri": str(uri),
+            "timestamp": datetime.now().isoformat()
         }
         return json.dumps(error_response, indent=2)
 
@@ -816,7 +858,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                     time_scope=time_scope,
                     max_results=max_results
                 )
-                response_text = json.dumps(results, indent=2, default=str)
+                response_text = json.dumps(results, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in query_memory: {str(e)}")
@@ -857,7 +899,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                     conversation_id=conversation_id,
                     analysis_type=analysis_type
                 )
-                response_text = json.dumps(analysis, indent=2, default=str)
+                response_text = json.dumps(analysis, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in analyze_conversation: {str(e)}")
@@ -873,7 +915,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
 
             try:
                 stats = await cme.get_memory_stats(include_details=include_details)
-                response_text = json.dumps(stats, indent=2, default=str)
+                response_text = json.dumps(stats, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in get_memory_stats: {str(e)}")
@@ -889,7 +931,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             try:
                 if cme.rtm_store:
                     details = await cme.rtm_store.get_tree_statistics(tree_id)
-                    response_text = json.dumps(details, indent=2, default=str)
+                    response_text = json.dumps(details, indent=2, default=serialize_complex_objects)
                     return [types.TextContent(type="text", text=response_text)]
                 else:
                     raise CMEError("RTM store not initialized.")
@@ -907,7 +949,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             try:
                 stats = await cme.get_memory_stats(include_details=include_details)
                 vector_store_details = stats.get("vector_store", {})
-                response_text = json.dumps(vector_store_details, indent=2, default=str)
+                response_text = json.dumps(vector_store_details, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in get_vector_store_details: {str(e)}")
@@ -1082,7 +1124,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                     "enhanced_tools_available": cme.context_assembler.enhanced_knowledge_tools is not None if cme.context_assembler else False
                 }
 
-                response_text = json.dumps(result, indent=2, default=str)
+                response_text = json.dumps(result, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
 
             except Exception as e:
@@ -1100,7 +1142,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             try:
                 concept = await cme.get_concept(concept_name)
                 if concept:
-                    response_text = json.dumps(concept, indent=2, default=str)
+                    response_text = json.dumps(concept, indent=2, default=serialize_complex_objects)
                 else:
                     response = {
                         "status": "not_found",
@@ -1124,7 +1166,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
 
             try:
                 shelf_data = await cme.browse_knowledge_shelf(domain)
-                response_text = json.dumps(shelf_data, indent=2, default=str)
+                response_text = json.dumps(shelf_data, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in browse_knowledge_shelf: {str(e)}")
@@ -1146,7 +1188,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                     include_formal=include_formal,
                     include_conversational=include_conversational
                 )
-                response_text = json.dumps(result, indent=2, default=str)
+                response_text = json.dumps(result, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in query_blended_knowledge: {str(e)}")
@@ -1173,7 +1215,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                     "links": links,
                     "timestamp": datetime.now().isoformat()
                 }
-                response_text = json.dumps(response, indent=2, default=str)
+                response_text = json.dumps(response, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in link_conversation_to_knowledge: {str(e)}")
@@ -1204,7 +1246,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 raise CMEError("Enhanced knowledge tools are not available.")
             try:
                 result = await enhanced_tools.store_knowledge_from_url(**arguments)
-                response_text = json.dumps(result, indent=2, default=str)
+                response_text = json.dumps(result, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in store_knowledge_from_url: {str(e)}")
@@ -1220,7 +1262,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 raise CMEError("Enhanced knowledge tools are not available.")
             try:
                 result = await enhanced_tools.store_knowledge_from_search(**arguments)
-                response_text = json.dumps(result, indent=2, default=str)
+                response_text = json.dumps(result, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in store_knowledge_from_search: {str(e)}")
@@ -1236,7 +1278,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 raise CMEError("Enhanced knowledge tools are not available.")
             try:
                 result = await enhanced_tools.enhance_existing_concept(**arguments)
-                response_text = json.dumps(result, indent=2, default=str)
+                response_text = json.dumps(result, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in enhance_existing_concept: {str(e)}")
