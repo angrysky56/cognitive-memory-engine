@@ -212,7 +212,6 @@ class DocumentKnowledgeBuilder:
         content += f"Description: {description}"
 
         root_concept = KnowledgeConcept(
-            concept_id=str(uuid.uuid4()),
             name=concept_name,
             description=description,
             content=content,
@@ -317,7 +316,6 @@ class DocumentKnowledgeBuilder:
         salience = max(0.1, 1.0 - (len(parent_concept.child_concept_ids) * 0.1))
 
         child_concept = KnowledgeConcept(
-            concept_id=str(uuid.uuid4()),
             name=component_name,
             description=description,
             parent_concept_id=parent_concept.concept_id,

@@ -52,8 +52,8 @@ dependencies = [
   "numpy>=2.3.1",
   "pandas>=2.3.1",
   "python-dateutil>=2.9.0.post0",
-  # Semantic Reasoning (Phase 3A: Prolog + Montague Architecture)
-  "pyswip>=0.3.3", # Python interface to SWI-Prolog for formal logic reasoning
+  # Semantic Reasoning (Phase 3A: Janus + Montague Architecture)
+  "janus-swi>=1.5.2", # Modern Python interface to SWI-Prolog for formal logic reasoning
   # HTTP and async
   "aiohttp>=3.12.14",
   "httpx>=0.27.0,<0.28", # Constrained by mcp-server-fetch
@@ -134,4 +134,9 @@ minversion = "7.0"
 addopts = "-ra -q --strict-markers"
 testpaths = [
     ".",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.3",
 ]

@@ -6,7 +6,6 @@ concept matching between conversations and documents.
 """
 
 import logging
-from typing import Any
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -124,7 +123,7 @@ class SemanticSimilarityCalculator:
         """
         similar_concepts = []
 
-        for concept_id, concept in concepts:
+        for _concept_id, concept in concepts:
             similarity = self.calculate_concept_similarity(node_content, concept)
 
             if similarity >= threshold:

@@ -396,6 +396,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "google-genai" },
     { name = "httpx" },
+    { name = "janus-swi" },
     { name = "loguru" },
     { name = "mcp", extra = ["cli"] },
     { name = "mcp-server-fetch" },
@@ -406,7 +407,6 @@ dependencies = [
     { name = "pandas" },
     { name = "prometheus-client" },
     { name = "pydantic" },
-    { name = "pyswip" },
     { name = "python-dateutil" },
     { name = "python-dotenv" },
     { name = "rich" },
@@ -429,6 +429,11 @@ dev = [
     { name = "ruff" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "ruff" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.14" },
@@ -440,6 +445,7 @@ requires-dist = [
     { name = "google-genai" },
     { name = "httpx", specifier = ">=0.27.0,<0.28" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=6.0.1" },
+    { name = "janus-swi", specifier = ">=1.5.2" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.2.0" },
     { name = "mcp-server-fetch", specifier = ">=2025.4.7" },
@@ -451,7 +457,6 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.3.1" },
     { name = "prometheus-client", specifier = ">=0.22.1" },
     { name = "pydantic", specifier = ">=2.11.7" },
-    { name = "pyswip", specifier = ">=0.3.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.1.0" },
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
@@ -467,6 +472,9 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.12.3" }]
 
 [[package]]
 name = "colorama"
@@ -914,6 +922,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b8/21/1e2a441f74a653a144224d7d21afe8f4169e6c7c20bb13aec3a2dc3815e0/isort-6.0.1.tar.gz", hash = "sha256:1cb5df28dfbc742e490c5e41bad6da41b805b0a8be7bc93cd0fb2a8a890ac450", size = 821955, upload-time = "2025-02-26T21:13:16.955Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/11/114d0a5f4dabbdcedc1125dee0888514c3c3b16d3e9facad87ed96fad97c/isort-6.0.1-py3-none-any.whl", hash = "sha256:2dc5d7f65c9678d94c88dfc29161a320eec67328bc97aad576874cb4be1e9615", size = 94186, upload-time = "2025-02-26T21:13:14.911Z" },
+]
+
+[[package]]
+name = "janus-swi"
+version = "1.5.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/3e/cb5f1d793c4f13627e57df04ac388de2b9b10797857dcbda749df8f11bfc/janus_swi-1.5.2.tar.gz", hash = "sha256:bfdea2e4933a35744412def927d6e748184a935076e2e51b1fdbbfbdf48d0e47", size = 89652, upload-time = "2025-01-11T13:10:26.861Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/05/7d7e634dfa721523e1d95f852db3297d2ef6f1a28047c493eb3b383b589a/janus_swi-1.5.2-cp313-cp313-win_amd64.whl", hash = "sha256:7802fc1d9671ed2341f266ac88d37c75770fdad9c936f3ef17bac2226d4caf81", size = 76540, upload-time = "2025-01-11T13:30:04.182Z" },
 ]
 
 [[package]]
@@ -2352,15 +2369,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0f/49/4cea918a08f02817aabae639e3d0ac046fef9f9180518a3ad394e22da148/pyreadline3-3.5.4.tar.gz", hash = "sha256:8d57d53039a1c75adba8e50dd3d992b28143480816187ea5efbd5c78e6c885b7", size = 99839, upload-time = "2024-09-19T02:40:10.062Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5a/dc/491b7661614ab97483abf2056be1deee4dc2490ecbf7bff9ab5cdbac86e1/pyreadline3-3.5.4-py3-none-any.whl", hash = "sha256:eaf8e6cc3c49bcccf145fc6067ba8643d1df34d604a1ec0eccbf7a18e6d3fae6", size = 83178, upload-time = "2024-09-19T02:40:08.598Z" },
-]
-
-[[package]]
-name = "pyswip"
-version = "0.3.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ff/75/96b326387af00edd34c7cca121ce98c10062d7b8dc5ec73324727997f678/pyswip-0.3.3.tar.gz", hash = "sha256:745cc6d86046a4cf9ba775a76f00d97f7d9129f7517515228391d7399bc4fe3d", size = 35963, upload-time = "2025-06-23T00:07:11.433Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b5/2b/c3bfc5a53714f7fb1b092aadb95277f133ce8c605f411f8888ca7ba340dd/pyswip-0.3.3-py3-none-any.whl", hash = "sha256:abddc4729917e3631e4a516e16211cbee93d4b701700eb116d6c3e8228ec3052", size = 36095, upload-time = "2025-06-23T00:07:09.282Z" },
 ]
 
 [[package]]

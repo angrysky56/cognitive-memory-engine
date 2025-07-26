@@ -1,42 +1,24 @@
 """
 LQEPR (Logical Query Enhanced Pattern Retrieval) Unified Query Interface
 
-Implements Phase 3B-2: Unifies Prolog formal logic + DuckDB graph queries + ChromaDB
-vector retrieval into elegant unified interface optimized for CLI usage.
-
-Following AETHELRED principles:
-- Clear unified interface for three query modes
-- Excellent CLI integration with typer + rich
-- Caching and performance optimization
-- Graceful degradation when components unavailable
+Unifies Prolog formal logic + DuckDB graph queries + ChromaDB
+vector retrieval for comprehensive semantic search and reasoning.
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-try:
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-    from rich.text import Text
-except ImportError:
-    # Graceful fallback for environments without rich
-    Console = None
-    Table = None
-    Panel = None
-    Text = None
-    Progress = None
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from ..storage.semantic_graph_store import SemanticGraphStore
 from ..storage.vector_store import VectorStore
-from ..types import LogicalResult, QueryContext, QueryMode
+from ..types import LogicalResult, QueryMode
 from .abstract_processors import AbstractQueryEngine, QueryExecutionError
-from .prolog_processor import PrologProcessor
+from .prolog_processor import PrologSemanticProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +91,7 @@ class LogicalQueryProcessor(AbstractQueryEngine):
     """
 
     def __init__(self,
-                 prolog_processor: PrologProcessor | None = None,
+                 prolog_processor: PrologSemanticProcessor | None = None,
                  semantic_graph_store: SemanticGraphStore | None = None,
                  vector_store: VectorStore | None = None,
                  config: dict[str, Any] | None = None):
@@ -129,7 +111,7 @@ class LogicalQueryProcessor(AbstractQueryEngine):
         self.vector_store = vector_store
         self.console = Console() if Console else None
 
-        # Query mode availability
+# Query mode availability
         self.modes_available = {
             QueryMode.LOGICAL: prolog_processor is not None,
             QueryMode.GRAPH: semantic_graph_store is not None,
@@ -250,20 +232,37 @@ class LogicalQueryProcessor(AbstractQueryEngine):
         )
 
     async def _query_logical(self, query_text: str, max_results: int) -> list[LogicalResult]:
-        """Execute Prolog formal logic query"""
+        """
+        Execute Prolog formal logic query
+
+        Args:
+            query_text: Query text
+            max_results: Maximum results to return
+
+        Returns:
+            List of LogicalResult objects
+
+        Raises:
+            QueryExecutionError: If Prolog is not available
+        """
         if not self.prolog_processor:
-            logger.warning("Prolog processor is not available.")
-            return []
-        try:
-            return await self.prolog_processor.query_compositional(query_text, max_results)
-        except Exception as e:
-            logger.warning(f"Prolog query failed: {e}")
-            return []
+            raise QueryExecutionError(
+                "Prolog processor not available. Install SWI-Prolog: sudo apt-get install swi-prolog"
+            )
+
+        if not hasattr(self.prolog_processor, 'query_compositional'):
+            raise QueryExecutionError(
+                "Prolog processor does not support compositional queries"
+            )
+
+        return await self.prolog_processor.query_compositional(query_text, max_results)
 
     async def _query_graph(self, query_text: str, max_results: int) -> list[tuple[str, float]]:
         """Execute DuckDB graph traversal query"""
         try:
             # Use semantic graph store to find related concepts
+            if not self.semantic_graph_store:
+                raise QueryExecutionError("Semantic graph store not available")
             concepts = await self.semantic_graph_store.search_concepts(query_text, limit=max_results)
             return [(concept['concept_id'], concept.get('relevance_score', 0.5)) for concept in concepts]
         except Exception as e:
@@ -273,8 +272,13 @@ class LogicalQueryProcessor(AbstractQueryEngine):
     async def _query_vector(self, query_text: str, max_results: int) -> list[tuple[str, float]]:
         """Execute ChromaDB vector similarity query"""
         try:
-            results = await self.vector_store.semantic_search(query_text, top_k=max_results)
-            return [(result['content'], result['score']) for result in results]
+            if not self.vector_store:
+                raise QueryExecutionError("Vector store not available")
+            from sentence_transformers import SentenceTransformer
+            model = SentenceTransformer('all-MiniLM-L6-v2')
+            query_embedding = model.encode(query_text).tolist()
+            results = await self.vector_store.search_vectors(query_embedding=query_embedding, n_results=max_results)
+            return [(result[0], float(result[1])) for result in results]
         except Exception as e:
             logger.warning(f"Vector query failed: {e}")
             return []
@@ -350,27 +354,84 @@ class LogicalQueryProcessor(AbstractQueryEngine):
 
     async def _get_logical_relevance(self, result: str, context: dict[str, Any]) -> float:
         """Get logical relevance score from Prolog"""
+        if not self.prolog_processor:
+            raise QueryExecutionError("Prolog processor not available for logical relevance scoring")
+
         try:
-            # Query Prolog for logical relevance
-            return 0.5  # Placeholder - implement actual Prolog query
-        except Exception:
-            return 0.0
+            # Query Prolog knowledge base for logical relevance
+            query = f"relevance('{result}', '{context.get('query', '')}', Score)"
+            prolog_results = self.prolog_processor.query_knowledge_base(query)
+
+            if prolog_results and len(prolog_results) > 0:
+                # Extract score from Prolog result
+                score = prolog_results[0].get('Score', 0.5)
+                return float(score) if isinstance(score, int | float) else 0.5
+            else:
+                # No specific relevance found, return default
+                return 0.5
+
+        except Exception as e:
+            logger.warning(f"Prolog relevance query failed: {e}")
+            raise QueryExecutionError(f"Prolog relevance scoring failed: {e}") from e
 
     async def _get_graph_relevance(self, result: str, context: dict[str, Any]) -> float:
         """Get graph relevance score from DuckDB"""
+        if not self.semantic_graph_store:
+            raise QueryExecutionError("Semantic graph store not available for graph relevance scoring")
+
         try:
-            # Query DuckDB for graph relevance
-            return 0.5  # Placeholder - implement actual graph query
-        except Exception:
-            return 0.0
+            # Search for related concepts in the semantic graph
+            query_text = context.get('query', '')
+            concepts = await self.semantic_graph_store.search_concepts(query_text, limit=10)
+
+            # Calculate relevance based on graph connections
+            relevance_score = 0.0
+            for concept in concepts:
+                concept_id = concept.get('concept_id', '')
+                # Check if result matches or relates to this concept
+                if result.lower() in concept_id.lower() or concept_id.lower() in result.lower():
+                    relevance_score = max(relevance_score, concept.get('relevance_score', 0.5))
+
+            return min(1.0, relevance_score)
+
+        except Exception as e:
+            logger.warning(f"Graph relevance query failed: {e}")
+            raise QueryExecutionError(f"Graph relevance scoring failed: {e}") from e
 
     async def _get_vector_relevance(self, result: str, context: dict[str, Any]) -> float:
         """Get vector relevance score from ChromaDB"""
+        if not self.vector_store:
+            raise QueryExecutionError("Vector store not available for vector relevance scoring")
+
         try:
-            # Query ChromaDB for vector relevance
-            return 0.5  # Placeholder - implement actual vector query
-        except Exception:
-            return 0.0
+            # Generate embedding for the result text
+            from sentence_transformers import SentenceTransformer
+
+            # Use a lightweight model for relevance scoring
+            model = SentenceTransformer('all-MiniLM-L6-v2')
+            result_embedding = model.encode(result).tolist()
+
+            # Search for similar vectors
+            search_results = await self.vector_store.search_vectors(
+                query_embedding=result_embedding,
+                n_results=5,
+                include=['distances', 'metadatas']
+            )
+
+            # Calculate relevance based on vector similarity
+            if search_results and 'distances' in search_results:
+                distances = search_results['distances'][0] if search_results['distances'] else []
+                if distances:
+                    # Convert distance to similarity (lower distance = higher similarity)
+                    max_distance = max(distances) if distances else 1.0
+                    similarity = 1.0 - (min(distances) / max_distance)
+                    return min(1.0, max(0.0, similarity))
+
+            return 0.3  # Default relevance score
+
+        except Exception as e:
+            logger.warning(f"Vector relevance query failed: {e}")
+            raise QueryExecutionError(f"Vector relevance scoring failed: {e}") from e
 
     def display_results(self, result: LQEPRResult, detailed: bool = False) -> None:
         """Display LQEPR results using rich formatting for CLI"""

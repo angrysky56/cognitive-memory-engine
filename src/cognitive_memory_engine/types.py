@@ -463,10 +463,12 @@ class BlendedQueryResult:
 class QueryMode(Enum):
     """Query execution modes for logical processing"""
     PROLOG = "prolog"
+    LOGICAL = "logical"  # Alias for PROLOG for backwards compatibility
     VECTOR = "vector"
     GRAPH = "graph"
     HYBRID = "hybrid"
     SEMANTIC = "semantic"
+    UNIFIED = "unified"  # For multi-mode unified queries
 
 
 @dataclass
@@ -503,10 +505,12 @@ class LogicalResult:
     success: bool = True
     data: dict[str, Any] = field(default_factory=dict)
     solutions: list[dict[str, Any]] = field(default_factory=list)
+    logical_form: str = ""  # Prolog logical form representation
 
     # Logical reasoning
     proof_trace: list[str] = field(default_factory=list)
     reasoning_steps: list[str] = field(default_factory=list)
+    confidence: float = 1.0  # Alias for confidence_score
     confidence_score: float = 1.0
 
     # Query execution metadata

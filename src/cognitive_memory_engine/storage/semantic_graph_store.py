@@ -375,6 +375,89 @@ class SemanticGraphStore:
             logger.error(f"Failed to analyze graph metrics: {e}")
             return {"error": str(e)}
 
+    async def search_concepts(self, query_text: str, limit: int = 10) -> list[dict[str, Any]]:
+        """
+        Search for concepts matching the query text.
+
+        Args:
+            query_text: Text to search for
+            limit: Maximum number of results
+
+        Returns:
+            List of concept dictionaries with relevance scores
+        """
+        if not self.initialized or not self.connection:
+            logger.warning("Graph store not initialized - returning empty results")
+            return []
+
+        try:
+            # Simple text search implementation
+            results = self.connection.execute("""
+                SELECT concept_id, name, domain, description,
+                       1.0 as relevance_score
+                FROM concepts
+                WHERE LOWER(name) LIKE LOWER(?)
+                   OR LOWER(description) LIKE LOWER(?)
+                ORDER BY name
+                LIMIT ?
+            """, [f"%{query_text}%", f"%{query_text}%", limit]).fetchall()
+
+            return [
+                {
+                    "concept_id": row[0],
+                    "name": row[1],
+                    "domain": row[2],
+                    "description": row[3],
+                    "relevance_score": row[4]
+                }
+                for row in results
+            ]
+
+        except Exception as e:
+            logger.error(f"Failed to search concepts: {e}")
+            return []
+
+    async def traverse_relationships(self, start_nodes: list[str],
+                                   query_pattern: str) -> list[dict[str, Any]]:
+        """
+        Traverse relationships from starting nodes following a pattern.
+
+        Args:
+            start_nodes: List of starting concept IDs
+            query_pattern: Pattern to follow (relationship type)
+
+        Returns:
+            List of relationship traversal results
+        """
+        if not self.initialized or not self.connection:
+            logger.warning("Graph store not initialized - returning empty results")
+            return []
+
+        try:
+            placeholders = ",".join("?" * len(start_nodes))
+            results = self.connection.execute(f"""
+                SELECT r.source_concept_id, r.target_concept_id,
+                       r.relationship_type, r.weight
+                FROM relationships r
+                WHERE r.source_concept_id IN ({placeholders})
+                  AND r.relationship_type = ?
+                ORDER BY r.weight DESC
+            """, start_nodes + [query_pattern]).fetchall()
+
+            return [
+                {
+                    "source_concept_id": row[0],
+                    "target_concept_id": row[1],
+                    "relationship_type": row[2],
+                    "weight": row[3]
+                }
+                for row in results
+            ]
+
+        except Exception as e:
+            logger.error(f"Failed to traverse relationships: {e}")
+            return []
+
     async def close(self) -> None:
         """Close the database connection."""
         if self.connection:

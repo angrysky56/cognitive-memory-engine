@@ -11,36 +11,25 @@ Following AETHELRED Elegance Toolkit:
 """
 
 import asyncio
-from pathlib import Path
-from typing import List, Optional
 
-try:
-    import typer
-    from rich import print as rprint
-    from rich.console import Console
-    from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.prompt import Confirm, Prompt
-    from rich.table import Table
-    from rich.text import Text
-except ImportError:
-    # Graceful fallback without rich/typer
-    typer = None
-    Console = None
-    rprint = print
+import typer
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Confirm, Prompt
+from rich.table import Table
 
 from ..semantic.logical_query_processor import LogicalQueryProcessor, LQEPRResult
 from ..types import QueryMode
-
-# Global console for rich formatting
-console = Console() if Console else None
 
 # CLI app instance
 app = typer.Typer(
     name="lqepr",
     help="LQEPR (Logical Query Enhanced Pattern Retrieval) CLI",
-    rich_markup_mode="rich" if typer else None
-) if typer else None
+    rich_markup_mode="rich"
+)
+
+# Global console for rich formatting
+console = Console()
 
 
 def init_query_processor() -> LogicalQueryProcessor:
@@ -63,10 +52,10 @@ def init_query_processor() -> LogicalQueryProcessor:
     )
 
 
-@app.command("query") if app else lambda: None
+@app.command("query")
 def query_command(
     query_text: str = typer.Argument(..., help="Natural language query text"),
-    modes: Optional[List[str]] = typer.Option(
+    modes: list[str] | None = typer.Option(
         None, "--mode", "-m",
         help="Query modes: logical, graph, vector (default: all available)"
     ),
@@ -107,17 +96,13 @@ def query_command(
     processor.display_results(result, detailed=detailed)
 
 
-@app.command("interactive") if app else lambda: None
+@app.command("interactive")
 def interactive_command():
     """
     Interactive LQEPR query session with guided prompts.
 
     Provides a conversational interface for building and executing queries.
     """
-    if not console:
-        print("Interactive mode requires rich library")
-        return
-
     console.print(Panel(
         "[bold blue]LQEPR Interactive Query Session[/bold blue]\n"
         "Build sophisticated queries using guided prompts.\n"
@@ -185,15 +170,11 @@ def interactive_command():
             console.print(f"[red]Error: {e}[/red]")
 
 
-@app.command("stats") if app else lambda: None
+@app.command("stats")
 def stats_command():
     """Display LQEPR system statistics and performance metrics."""
     processor = init_query_processor()
     stats = processor.get_stats()
-
-    if not console:
-        print(f"LQEPR Statistics: {stats}")
-        return
 
     # Create rich table for statistics
     table = Table(title="LQEPR System Statistics")
@@ -213,7 +194,7 @@ def stats_command():
     console.print(table)
 
 
-@app.command("test") if app else lambda: None
+@app.command("test")
 def test_command(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose test output")
 ):
@@ -226,7 +207,7 @@ def test_command(
 
 
 async def _execute_query(query_text: str,
-                        modes: Optional[List[QueryMode]] = None,
+                        modes: list[QueryMode] | None = None,
                         max_results: int = 10,
                         timeout: float = 30.0,
                         show_progress: bool = True) -> LQEPRResult:
@@ -245,10 +226,7 @@ async def _execute_query(query_text: str,
         return result
 
     except Exception as e:
-        if console:
-            console.print(f"[red]Query execution failed: {e}[/red]")
-        else:
-            print(f"Query execution failed: {e}")
+        console.print(f"[red]Query execution failed: {e}[/red]")
 
         # Return empty result
         return LQEPRResult(
@@ -266,14 +244,11 @@ async def _execute_query(query_text: str,
 
 async def _run_tests(verbose: bool = False):
     """Run LQEPR system tests"""
-    if not console:
-        print("Running LQEPR tests...")
-    else:
-        console.print(Panel(
-            "[bold blue]LQEPR System Tests[/bold blue]\n"
-            "Testing all components and query modes...",
-            title="System Verification"
-        ))
+    console.print(Panel(
+        "[bold blue]LQEPR System Tests[/bold blue]\n"
+        "Testing all components and query modes...",
+        title="System Verification"
+    ))
 
     processor = init_query_processor()
     test_queries = [
@@ -286,10 +261,7 @@ async def _run_tests(verbose: bool = False):
     results = []
 
     for i, query in enumerate(test_queries, 1):
-        if console:
-            console.print(f"[cyan]Test {i}:[/cyan] {query}")
-        else:
-            print(f"Test {i}: {query}")
+        console.print(f"[cyan]Test {i}:[/cyan] {query}")
 
         try:
             result = await processor.unified_query(
@@ -303,44 +275,31 @@ async def _run_tests(verbose: bool = False):
 
             if verbose:
                 processor.display_results(result, detailed=True)
-            elif console:
+            else:
                 status = "[green]✓ PASS[/green]" if success else "[red]✗ FAIL[/red]"
                 console.print(f"  {status} - Score: {result.unified_score:.3f}")
-            else:
-                status = "PASS" if success else "FAIL"
-                print(f"  {status} - Score: {result.unified_score:.3f}")
 
         except Exception as e:
             results.append(False)
-            if console:
-                console.print(f"  [red]✗ ERROR: {e}[/red]")
-            else:
-                print(f"  ERROR: {e}")
+            console.print(f"  [red]✗ ERROR: {e}[/red]")
 
     # Summary
     passed = sum(results)
     total = len(results)
 
-    if console:
-        color = "green" if passed == total else "yellow" if passed > 0 else "red"
-        console.print(f"\n[{color}]Tests passed: {passed}/{total}[/{color}]")
+    color = "green" if passed == total else "yellow" if passed > 0 else "red"
+    console.print(f"\n[{color}]Tests passed: {passed}/{total}[/{color}]")
 
-        if passed == total:
-            console.print("[green]🎉 All LQEPR components working correctly![/green]")
-        elif passed > 0:
-            console.print("[yellow]⚠️  Some components may need attention[/yellow]")
-        else:
-            console.print("[red]❌ LQEPR system needs debugging[/red]")
+    if passed == total:
+        console.print("[green]🎉 All LQEPR components working correctly![/green]")
+    elif passed > 0:
+        console.print("[yellow]⚠️  Some components may need attention[/yellow]")
     else:
-        print(f"Tests passed: {passed}/{total}")
+        console.print("[red]❌ LQEPR system needs debugging[/red]")
 
 
 def main():
     """Main CLI entry point"""
-    if not app:
-        print("CLI requires typer library. Install with: pip install typer rich")
-        return
-
     app()
 
 
