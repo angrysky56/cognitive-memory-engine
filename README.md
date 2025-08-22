@@ -12,6 +12,9 @@ A sophisticated Model Context Protocol server implementing a neuroscience-inspir
 - ✅ **Unified Interface**: All tracks accessible through single engine
 - ✅ **Production Ready**: Comprehensive testing and error handling
 
+Intelligent query analysis inspired by Memp's procedural memory concepts:
+https://huggingface.co/papers/2508.06433
+
 ## 🚀 Quick Start
 
 ### Installation

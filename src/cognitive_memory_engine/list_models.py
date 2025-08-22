@@ -59,7 +59,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Error listing models: {e}")
         print("\nMake sure you have the required packages installed:")
-        print("  pip install ollama openai google-generativeai anthropic")
+        print("  uv pip install ollama openai google-genai anthropic")
 
 
 if __name__ == "__main__":

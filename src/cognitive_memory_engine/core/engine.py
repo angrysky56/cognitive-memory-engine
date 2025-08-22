@@ -1015,17 +1015,23 @@ class CognitiveMemoryEngine:
         try:
             logger.info(f"Generating response for: '{prompt[:50]}...'")
 
-            # Step 1: Query relevant memory context
+            # Step 1: Intelligent query analysis for adaptive memory retrieval
+            query_analysis = await self._analyze_query_intent(prompt)
+
+            # Step 2: Query relevant memory context with adaptive parameters
             await self.query_memory(
-                prompt, context_depth, "week", 5
+                prompt,
+                query_analysis["context_depth"],
+                query_analysis["time_scope"],  # Fixed: time_scope not temporal_scope
+                query_analysis["max_results"]
             )
 
-            # Step 2: Assemble context for response generation
+            # Step 3: Assemble context for response generation with optimal strategy
             context = await self.context_assembler.assemble_context(
                 query=prompt,
-                max_depth=context_depth,
-                temporal_scope="week",
-                strategy="hybrid"
+                max_depth=query_analysis["context_depth"],
+                temporal_scope=query_analysis["temporal_scope"],
+                strategy=query_analysis["retrieval_strategy"]
             )
 
             # Step 3: Generate response with memory context
@@ -1042,6 +1048,79 @@ class CognitiveMemoryEngine:
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             raise CMEError(f"Response generation failed: {e}") from e
+
+    async def _analyze_query_intent(self, prompt: str) -> dict[str, Any]:
+        """
+        Analyze query intent to optimize memory retrieval parameters.
+
+        Inspired by procedural memory patterns from Memp paper - different
+        query types benefit from different temporal scopes and retrieval strategies.
+
+        Args:
+            prompt: User's query text
+
+        Returns:
+            Dictionary with optimized retrieval parameters
+        """
+        prompt_lower = prompt.lower()
+
+        # Query type detection patterns
+        debugging_patterns = ["error", "debug", "fix", "broken", "issue", "problem", "troubleshoot", "fail"]
+        implementation_patterns = ["how to", "implement", "create", "build", "make", "code", "write"]
+        research_patterns = ["what is", "explain", "research", "analyze", "understand", "learn"]
+        recent_patterns = ["today", "yesterday", "recent", "latest", "current", "now"]
+
+        # Default parameters (original behavior)
+        analysis = {
+            "context_depth": 3,
+            "temporal_scope": "week",
+            "max_results": 5,
+            "retrieval_strategy": "hybrid",
+            "query_type": "general"
+        }
+
+        # Debugging queries - look for recent similar problems and solutions
+        if any(pattern in prompt_lower for pattern in debugging_patterns):
+            analysis.update({
+                "context_depth": 4,  # Deeper context for troubleshooting
+                "temporal_scope": "month",  # Look back further for similar issues
+                "max_results": 8,  # More examples of solutions
+                "retrieval_strategy": "hybrid",
+                "query_type": "debugging"
+            })
+
+        # Implementation queries - find proven patterns and approaches
+        elif any(pattern in prompt_lower for pattern in implementation_patterns):
+            analysis.update({
+                "context_depth": 5,  # Deep context for implementation details
+                "temporal_scope": "all",  # Look for all proven patterns
+                "max_results": 7,  # Multiple implementation examples
+                "retrieval_strategy": "hybrid",
+                "query_type": "implementation"
+            })
+
+        # Research queries - broad knowledge retrieval
+        elif any(pattern in prompt_lower for pattern in research_patterns):
+            analysis.update({
+                "context_depth": 3,
+                "temporal_scope": "all",  # All available knowledge
+                "max_results": 10,  # Comprehensive information
+                "retrieval_strategy": "hybrid",
+                "query_type": "research"
+            })
+
+        # Recent/temporal queries - focus on recency
+        elif any(pattern in prompt_lower for pattern in recent_patterns):
+            analysis.update({
+                "context_depth": 2,
+                "temporal_scope": "day",  # Very recent focus
+                "max_results": 5,
+                "retrieval_strategy": "hybrid",
+                "query_type": "recent"
+            })
+
+        logger.info(f"Query analysis: {analysis['query_type']} -> scope: {analysis['temporal_scope']}, depth: {analysis['context_depth']}")
+        return analysis
 
     async def analyze_conversation(
         self,
