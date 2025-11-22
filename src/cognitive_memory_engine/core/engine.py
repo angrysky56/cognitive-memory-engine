@@ -96,19 +96,11 @@ class CognitiveMemoryEngine:
             data_directory="data",
             llm_model="gpt-4.1-nano",
             embedding_model="all-MiniLM-L6-v2",
-            rtm_config=RTMConfig(
-                max_branching_factor=4,
-                max_recall_depth=6,
-                max_summary_length=150
-            ),
-            neural_gain_config=NeuralGainConfig(
-                base_salience=1.0,
-                temporal_decay_factor=0.1,
-                max_gain_multiplier=3.0
-            ),
+            rtm_config=RTMConfig(max_branching_factor=4, max_recall_depth=6, max_summary_length=150),
+            neural_gain_config=NeuralGainConfig(base_salience=1.0, temporal_decay_factor=0.1, max_gain_multiplier=3.0),
             max_context_length=4096,
             vector_similarity_threshold=0.8,
-            auto_archive_days=30
+            auto_archive_days=30,
         )
 
         # Initialize all components directly in the constructor
@@ -117,10 +109,7 @@ class CognitiveMemoryEngine:
         data_dir.mkdir(exist_ok=True)
 
         # Initialize storage systems
-        self.vector_store = VectorStore({
-            "persist_directory": str(data_dir / "chroma_db"),
-            "collection_name": "cme_memory"
-        })
+        self.vector_store = VectorStore({"persist_directory": str(data_dir / "chroma_db"), "collection_name": "cme_memory"})
         # Note: In a real async application, we'd need an async constructor
         # or a factory pattern. For now, we assume sync init is sufficient
         # for object creation, and async operations happen in methods.
@@ -134,51 +123,21 @@ class CognitiveMemoryEngine:
         cloud_config = get_cloud_provider_config()
 
         # Initialize comprehension components
-        self.document_builder = DocumentKnowledgeBuilder(
-            cloud_config=cloud_config,
-            document_store=self.document_store
-        )
-        self.narrative_builder = NarrativeTreeBuilder(
-            cloud_config=cloud_config,
-            rtm_store=self.rtm_store,
-            config=self.config.rtm_config
-        )
+        self.document_builder = DocumentKnowledgeBuilder(cloud_config=cloud_config, document_store=self.document_store)
+        self.narrative_builder = NarrativeTreeBuilder(cloud_config=cloud_config, rtm_store=self.rtm_store, config=self.config.rtm_config)
 
         # Initialize workspace components
-        if self.config.vector_manager == 'svg':
-            self.vector_manager = SVGVectorManager(
-                storage_path=str(data_dir / "vectors"),
-                embedding_model=self.config.embedding_model,
-                config=self.config.neural_gain_config,
-                svg_config=self.config.svg_config
-            )
+        if self.config.vector_manager == "svg":
+            self.vector_manager = SVGVectorManager(storage_path=str(data_dir / "vectors"), embedding_model=self.config.embedding_model, config=self.config.neural_gain_config, svg_config=self.config.svg_config)
         else:
-            self.vector_manager = VectorManager(
-                storage_path=str(data_dir / "vectors"),
-                embedding_model=self.config.embedding_model,
-                config=self.config.neural_gain_config
-            )
+            self.vector_manager = VectorManager(storage_path=str(data_dir / "vectors"), embedding_model=self.config.embedding_model, config=self.config.neural_gain_config)
 
-        self.temporal_organizer = TemporalOrganizer(
-            temporal_library=self.temporal_library,
-            vector_manager=self.vector_manager,
-            rtm_store=self.rtm_store,
-            config=self.config.neural_gain_config
-        )
+        self.temporal_organizer = TemporalOrganizer(temporal_library=self.temporal_library, vector_manager=self.vector_manager, rtm_store=self.rtm_store, config=self.config.neural_gain_config)
 
-        self.context_assembler = ContextAssembler(
-            vector_manager=self.vector_manager,
-            rtm_store=self.rtm_store,
-            temporal_library=self.temporal_library,
-            max_context_length=self.config.max_context_length
-        )
+        self.context_assembler = ContextAssembler(vector_manager=self.vector_manager, rtm_store=self.rtm_store, temporal_library=self.temporal_library, max_context_length=self.config.max_context_length)
 
         # Initialize production components
-        self.response_generator = ResponseGenerator(
-            cloud_config=cloud_config,
-            max_response_length=1000,
-            temperature=0.7
-        )
+        self.response_generator = ResponseGenerator(cloud_config=cloud_config, max_response_length=1000, temperature=0.7)
 
         self.initialized = True
         self.enhanced_knowledge_tools: EnhancedKnowledgeServerTools | None = None
@@ -201,7 +160,7 @@ class CognitiveMemoryEngine:
         Asynchronously initialize components that require it (like database connections).
         """
         if not self.initialized:
-             # Fallback if somehow __init__ was bypassed or failed silently
+            # Fallback if somehow __init__ was bypassed or failed silently
             self.__init__(self.config)
 
         logger.info("Running async initializations...")
@@ -250,11 +209,7 @@ class CognitiveMemoryEngine:
         else:
             logger.warning("No provider available to set model.")
 
-    async def store_conversation(
-        self,
-        conversation: list[dict[str, str]],
-        context: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def store_conversation(self, conversation: list[dict[str, str]], context: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Store a conversation in memory with full cognitive analysis.
 
@@ -284,20 +239,12 @@ class CognitiveMemoryEngine:
                     conversation_turns.append(msg)
                 else:
                     # Assume it's a dictionary
-                    conversation_turns.append(ConversationTurn(
-                        role=msg["role"],
-                        content=msg["content"],
-                        timestamp=timestamp
-                    ))
+                    conversation_turns.append(ConversationTurn(role=msg["role"], content=msg["content"], timestamp=timestamp))
 
             logger.info(f"Processing conversation with {len(conversation_turns)} turns")
 
             # Step 1: Build narrative tree using RTM algorithm
-            rtm_tree = await self.narrative_builder.build_tree_from_conversation(
-                conversation_turns,
-                session_id,
-                TemporalScale.DAY
-            )
+            rtm_tree = await self.narrative_builder.build_tree_from_conversation(conversation_turns, session_id, TemporalScale.DAY)
 
             # Step 1a: Store the RTM tree
             if self.rtm_store and rtm_tree:
@@ -309,20 +256,12 @@ class CognitiveMemoryEngine:
             # Step 2: Organize temporally into books and shelves
             if not self.temporal_organizer:
                 raise CMEError("Temporal organizer not initialized")
-            temporal_book = await self.temporal_organizer.organize_conversation(
-                conversation_turns,
-                rtm_tree,
-                session_id
-            )
+            temporal_book = await self.temporal_organizer.organize_conversation(conversation_turns, rtm_tree, session_id)
 
             logger.info(f"Organized into temporal book {temporal_book.book_id}")
 
             # Step 3: Store vectors with neural gain weighting
-            vector_results = await self.vector_manager.store_conversation_vectors(
-                conversation_turns,
-                rtm_tree,
-                temporal_book
-            )
+            vector_results = await self.vector_manager.store_conversation_vectors(conversation_turns, rtm_tree, temporal_book)
 
             logger.info("Stored vectors with neural gain weighting")
 
@@ -335,20 +274,15 @@ class CognitiveMemoryEngine:
                 "session_id": str(session_id),
                 "timestamp": timestamp.isoformat(),
                 "message_count": len(conversation),
-                "rtm_tree": {
-                    "tree_id": str(rtm_tree.tree_id),
-                    "node_count": getattr(rtm_tree, 'node_count', 0),
-                    "compression_ratio": getattr(rtm_tree, 'compression_ratio', 0.0),
-                    "max_depth": getattr(rtm_tree, 'max_recall_depth', 0)
-                },
+                "rtm_tree": {"tree_id": str(rtm_tree.tree_id), "node_count": getattr(rtm_tree, "node_count", 0), "compression_ratio": getattr(rtm_tree, "compression_ratio", 0.0), "max_depth": getattr(rtm_tree, "max_recall_depth", 0)},
                 "temporal_book": {
                     "book_id": str(temporal_book.book_id),
-                    "temporal_scale": str(temporal_book.temporal_scale.value) if hasattr(temporal_book.temporal_scale, 'value') else str(temporal_book.temporal_scale),
-                    "shelf_category": str(temporal_book.shelf_category.value) if hasattr(temporal_book.shelf_category, 'value') else str(temporal_book.shelf_category),
-                    "persistent_themes": list(temporal_book.persistent_themes) if temporal_book.persistent_themes else []
+                    "temporal_scale": str(temporal_book.temporal_scale.value) if hasattr(temporal_book.temporal_scale, "value") else str(temporal_book.temporal_scale),
+                    "shelf_category": str(temporal_book.shelf_category.value) if hasattr(temporal_book.shelf_category, "value") else str(temporal_book.shelf_category),
+                    "persistent_themes": list(temporal_book.persistent_themes) if temporal_book.persistent_themes else [],
                 },
                 "vector_storage": vector_results,
-                "status": "success"
+                "status": "success",
             }
 
             logger.info(f"Successfully stored conversation {rtm_tree.tree_id}")
@@ -361,13 +295,7 @@ class CognitiveMemoryEngine:
     # DUAL-TRACK ARCHITECTURE METHODS
     # ================================
 
-    async def store_document_knowledge(
-        self,
-        document_content: str,
-        root_concept: str,
-        domain: str,
-        metadata: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def store_document_knowledge(self, document_content: str, root_concept: str, domain: str, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         """
         Store formal document as structured knowledge RTM.
 
@@ -403,12 +331,7 @@ class CognitiveMemoryEngine:
             logger.info(f"Storing document knowledge for '{root_concept}' in domain {domain_enum.value}")
 
             # Use document builder to create and store DocumentRTM
-            document_id = await self.document_builder.store_document_knowledge(
-                document_content=document_content,
-                root_concept=root_concept,
-                domain=domain_enum,
-                metadata=metadata
-            )
+            document_id = await self.document_builder.store_document_knowledge(document_content=document_content, root_concept=root_concept, domain=domain_enum, metadata=metadata)
 
             # Get the stored document for analysis
             document = await self.document_store.get_document(document_id)
@@ -423,23 +346,10 @@ class CognitiveMemoryEngine:
                 "domain": domain_enum.value,
                 "storage_type": "formal_knowledge",
                 "timestamp": datetime.now().isoformat(),
-                "document_analysis": {
-                    "total_concepts": document.total_concepts,
-                    "compression_ratio": document.compression_ratio,
-                    "max_depth": document.max_depth,
-                    "root_concept_id": document.root_concept_id
-                },
-                "concept_hierarchy": {
-                    concept_id: {
-                        "name": concept.name,
-                        "description": concept.description,
-                        "children_count": len(concept.child_concept_ids),
-                        "salience_score": concept.salience_score
-                    }
-                    for concept_id, concept in document.concepts.items()
-                },
+                "document_analysis": {"total_concepts": document.total_concepts, "compression_ratio": document.compression_ratio, "max_depth": document.max_depth, "root_concept_id": document.root_concept_id},
+                "concept_hierarchy": {concept_id: {"name": concept.name, "description": concept.description, "children_count": len(concept.child_concept_ids), "salience_score": concept.salience_score} for concept_id, concept in document.concepts.items()},
                 "metadata": document.source_metadata,
-                "status": "success"
+                "status": "success",
             }
 
             logger.info(f"Successfully stored document knowledge '{root_concept}' with {document.total_concepts} concepts")
@@ -449,11 +359,7 @@ class CognitiveMemoryEngine:
             logger.error(f"Failed to store document knowledge for '{root_concept}': {e}")
             raise CMEError(f"Document knowledge storage failed: {e}") from e
 
-    async def link_conversation_to_knowledge(
-        self,
-        conversation_id: str,
-        document_concept_id: str | None = None
-    ) -> list[dict[str, Any]]:
+    async def link_conversation_to_knowledge(self, conversation_id: str, document_concept_id: str | None = None) -> list[dict[str, Any]]:
         """
         Create cross-references between conversation and document knowledge.
 
@@ -478,6 +384,7 @@ class CognitiveMemoryEngine:
         try:
             # Import semantic similarity calculator
             from ..semantic.similarity_calculator import SemanticSimilarityCalculator
+
             similarity_calc = SemanticSimilarityCalculator(self.config.embedding_model)
 
             # Get all document concepts for matching
@@ -501,7 +408,7 @@ class CognitiveMemoryEngine:
             created_links = []
 
             for node in conversation_tree.nodes.values():
-                if not node or not hasattr(node, 'content') or not hasattr(node, 'node_id'):
+                if not node or not hasattr(node, "content") or not hasattr(node, "node_id"):
                     continue
 
                 # Skip very short content
@@ -512,7 +419,7 @@ class CognitiveMemoryEngine:
                 similar_concepts = similarity_calc.find_similar_concepts(
                     node.content,
                     all_concepts,
-                    threshold=0.4  # Minimum similarity threshold
+                    threshold=0.4,  # Minimum similarity threshold
                 )
 
                 # Create links for similar concepts
@@ -526,34 +433,33 @@ class CognitiveMemoryEngine:
 
                     # Create ConceptLink object
                     from ..types import ConceptLink
+
                     link = ConceptLink(
                         conversation_node_id=node.node_id,
                         conversation_tree_id=conversation_id,
                         document_concept_id=concept.concept_id,
-                        document_id=concept.concept_id.split('_')[0] if '_' in concept.concept_id else '',
+                        document_id=concept.concept_id.split("_")[0] if "_" in concept.concept_id else "",
                         relationship_type=relationship_type,
                         confidence_score=similarity_score,
                         context_snippet=node.content[:150] + "..." if len(node.content) > 150 else node.content,
-                        metadata={
-                            'concept_name': concept.name,
-                            'node_type': node.node_type.value,
-                            'node_depth': node.depth
-                        }
+                        metadata={"concept_name": concept.name, "node_type": node.node_type.value, "node_depth": node.depth},
                     )
 
                     # Persist the link
                     if await self.cross_reference_store.store_link(link):
                         # Convert to dict for response
-                        created_links.append({
-                            'link_id': link.link_id,
-                            'conversation_node_id': link.conversation_node_id,
-                            'document_concept_id': link.document_concept_id,
-                            'document_id': link.document_id,
-                            'relationship_type': link.relationship_type.value,
-                            'confidence_score': link.confidence_score,
-                            'concept_name': concept.name,
-                            'context_snippet': link.context_snippet
-                        })
+                        created_links.append(
+                            {
+                                "link_id": link.link_id,
+                                "conversation_node_id": link.conversation_node_id,
+                                "document_concept_id": link.document_concept_id,
+                                "document_id": link.document_id,
+                                "relationship_type": link.relationship_type.value,
+                                "confidence_score": link.confidence_score,
+                                "concept_name": concept.name,
+                                "context_snippet": link.context_snippet,
+                            }
+                        )
 
             logger.info(f"Created and persisted {len(created_links)} cross-reference links")
             return created_links
@@ -563,12 +469,7 @@ class CognitiveMemoryEngine:
             raise CMEError(f"Cross-reference creation failed: {e}") from e
             return []
 
-    async def query_blended_knowledge(
-        self,
-        query: str,
-        include_formal: bool = True,
-        include_conversational: bool = True
-    ) -> dict[str, Any]:
+    async def query_blended_knowledge(self, query: str, include_formal: bool = True, include_conversational: bool = True) -> dict[str, Any]:
         """
         Unified query interface combining both knowledge tracks.
 
@@ -597,18 +498,12 @@ class CognitiveMemoryEngine:
 
         logger.info(f"Blended query: '{query[:50]}...'")
 
-        result = {
-            'query': query,
-            'formal_knowledge': [],
-            'conversation_insights': {},
-            'cross_references': [],
-            'unified_summary': '',
-            'confidence_score': 0.0
-        }
+        result = {"query": query, "formal_knowledge": [], "conversation_insights": {}, "cross_references": [], "unified_summary": "", "confidence_score": 0.0}
 
         try:
             # Import semantic similarity calculator
             from ..semantic.similarity_calculator import SemanticSimilarityCalculator
+
             similarity_calc = SemanticSimilarityCalculator(self.config.embedding_model)
             # Track 1: Query formal document knowledge with semantic similarity
             if include_formal:
@@ -628,36 +523,30 @@ class CognitiveMemoryEngine:
                     similarity_score = similarity_calc.calculate_similarity(query, concept_text)
 
                     if similarity_score > 0.3:  # Threshold for relevance
-                        formal_matches.append({
-                            'concept_id': concept.concept_id,
-                            'document_id': doc.doc_id,
-                            'concept': concept,
-                            'relevance_score': similarity_score,
-                            'document_title': doc.root_concept,
-                            'concept_name': concept.name,
-                            'description': concept.description[:200] + "..." if len(concept.description) > 200 else concept.description
-                        })
+                        formal_matches.append(
+                            {
+                                "concept_id": concept.concept_id,
+                                "document_id": doc.doc_id,
+                                "concept": concept,
+                                "relevance_score": similarity_score,
+                                "document_title": doc.root_concept,
+                                "concept_name": concept.name,
+                                "description": concept.description[:200] + "..." if len(concept.description) > 200 else concept.description,
+                            }
+                        )
 
                 # Sort by relevance and take top matches
-                formal_matches.sort(key=lambda x: x['relevance_score'], reverse=True)
-                result['formal_knowledge'] = formal_matches[:5]
+                formal_matches.sort(key=lambda x: x["relevance_score"], reverse=True)
+                result["formal_knowledge"] = formal_matches[:5]
 
             # Track 2: Query conversation memory
             if include_conversational:
-                conversation_results = await self.query_memory(
-                    query=query,
-                    context_depth=3,
-                    max_results=5
-                )
+                conversation_results = await self.query_memory(query=query, context_depth=3, max_results=5)
 
-                result['conversation_insights'] = {
-                    'results': conversation_results.get('results', []),
-                    'context_summary': conversation_results.get('context_summary', ''),
-                    'total_results': conversation_results.get('total_results', 0)
-                }
+                result["conversation_insights"] = {"results": conversation_results.get("results", []), "context_summary": conversation_results.get("context_summary", ""), "total_results": conversation_results.get("total_results", 0)}
 
             # Track 3: Retrieve persisted cross-references
-            if result['formal_knowledge'] or result['conversation_insights']['results']:
+            if result["formal_knowledge"] or result["conversation_insights"]["results"]:
                 # Get all cross-references with high confidence
                 all_links = await self.cross_reference_store.get_all_links(min_confidence=0.5)
 
@@ -665,52 +554,45 @@ class CognitiveMemoryEngine:
                 relevant_links = []
 
                 # Check formal knowledge matches
-                for match in result['formal_knowledge']:
-                    concept_id = match['concept_id']
+                for match in result["formal_knowledge"]:
+                    concept_id = match["concept_id"]
                     # Find links for this concept
                     concept_links = [link for link in all_links if link.document_concept_id == concept_id]
 
                     for link in concept_links[:2]:  # Top 2 links per concept
-                        relevant_links.append({
-                            'link_id': link.link_id,
-                            'formal_concept': match['concept_name'],
-                            'conversation_fragment': link.context_snippet,
-                            'relationship': link.relationship_type.value,
-                            'confidence': link.confidence_score,
-                            'conversation_id': link.conversation_tree_id
-                        })
+                        relevant_links.append({"link_id": link.link_id, "formal_concept": match["concept_name"], "conversation_fragment": link.context_snippet, "relationship": link.relationship_type.value, "confidence": link.confidence_score, "conversation_id": link.conversation_tree_id})
 
                 # Sort by confidence and limit
-                relevant_links.sort(key=lambda x: x['confidence'], reverse=True)
-                result['cross_references'] = relevant_links[:10]
+                relevant_links.sort(key=lambda x: x["confidence"], reverse=True)
+                result["cross_references"] = relevant_links[:10]
 
             # Generate unified summary
             summary_parts = []
 
-            if result['formal_knowledge']:
+            if result["formal_knowledge"]:
                 formal_summary = f"Formal knowledge: Found {len(result['formal_knowledge'])} relevant concepts"
-                if result['formal_knowledge']:
-                    top_concept = result['formal_knowledge'][0]
+                if result["formal_knowledge"]:
+                    top_concept = result["formal_knowledge"][0]
                     formal_summary += f" including '{top_concept['concept_name']}' (relevance: {top_concept['relevance_score']:.2f})"
                 summary_parts.append(formal_summary)
 
-            if result['conversation_insights']['results']:
-                conv_count = len(result['conversation_insights']['results'])
+            if result["conversation_insights"]["results"]:
+                conv_count = len(result["conversation_insights"]["results"])
                 conv_summary = f"Conversation insights: Found {conv_count} relevant discussion fragments"
                 summary_parts.append(conv_summary)
 
-            if result['cross_references']:
+            if result["cross_references"]:
                 cross_summary = f"Cross-references: {len(result['cross_references'])} connections between formal knowledge and conversations"
                 summary_parts.append(cross_summary)
 
-            result['unified_summary'] = '. '.join(summary_parts) if summary_parts else "No relevant knowledge found"
+            result["unified_summary"] = ". ".join(summary_parts) if summary_parts else "No relevant knowledge found"
 
             # Calculate overall confidence using semantic scores
-            formal_confidence = max([m['relevance_score'] for m in result['formal_knowledge']], default=0.0)
-            conv_confidence = 0.6 if result['conversation_insights']['results'] else 0.0
-            cross_confidence = max([link['confidence'] for link in result['cross_references']], default=0.0)
+            formal_confidence = max([m["relevance_score"] for m in result["formal_knowledge"]], default=0.0)
+            conv_confidence = 0.6 if result["conversation_insights"]["results"] else 0.0
+            cross_confidence = max([link["confidence"] for link in result["cross_references"]], default=0.0)
 
-            result['confidence_score'] = max(formal_confidence, conv_confidence, cross_confidence)
+            result["confidence_score"] = max(formal_confidence, conv_confidence, cross_confidence)
 
             logger.info(f"Blended query complete: {len(result['formal_knowledge'])} formal, {len(result['conversation_insights'].get('results', []))} conversational, {len(result['cross_references'])} cross-refs")
 
@@ -718,7 +600,7 @@ class CognitiveMemoryEngine:
 
         except Exception as e:
             logger.error(f"Error in blended query: {e}")
-            result['unified_summary'] = f"Error processing query: {str(e)}"
+            result["unified_summary"] = f"Error processing query: {str(e)}"
             return result
 
     async def get_concept(self, concept_name: str) -> dict[str, Any] | None:
@@ -758,27 +640,13 @@ class CognitiveMemoryEngine:
                 "description": concept.description,
                 "content": concept.content,
                 "domain": concept.domain.value,
-                "document_context": {
-                    "document_id": document.doc_id,
-                    "document_title": document.title,
-                    "root_concept": document.root_concept
-                },
-                "hierarchy": {
-                    "parent_concept_id": concept.parent_concept_id,
-                    "child_concept_ids": concept.child_concept_ids,
-                    "related_concept_ids": concept.related_concept_ids
-                },
+                "document_context": {"document_id": document.doc_id, "document_title": document.title, "root_concept": document.root_concept},
+                "hierarchy": {"parent_concept_id": concept.parent_concept_id, "child_concept_ids": concept.child_concept_ids, "related_concept_ids": concept.related_concept_ids},
                 "structured_data": concept.structured_data,
                 "examples": concept.examples,
-                "metadata": {
-                    "salience_score": concept.salience_score,
-                    "confidence_score": concept.confidence_score,
-                    "tags": concept.tags,
-                    "created": concept.created.isoformat(),
-                    "last_updated": concept.last_updated.isoformat()
-                },
+                "metadata": {"salience_score": concept.salience_score, "confidence_score": concept.confidence_score, "tags": concept.tags, "created": concept.created.isoformat(), "last_updated": concept.last_updated.isoformat()},
                 "source_type": "formal_knowledge",
-                "retrieved_at": datetime.now().isoformat()
+                "retrieved_at": datetime.now().isoformat(),
             }
 
             logger.info(f"Retrieved concept '{concept_name}' from document knowledge")
@@ -788,15 +656,17 @@ class CognitiveMemoryEngine:
             logger.error(f"Failed to retrieve concept '{concept_name}': {e}")
             raise CMEError(f"Concept retrieval failed: {e}") from e
 
-    async def browse_knowledge_shelf(self, domain: str) -> dict[str, Any]:
+    async def browse_knowledge_shelf(self, domain: str, limit: int = 20, offset: int = 0) -> dict[str, Any]:
         """
-        Browse all concepts in a knowledge domain.
+        Browse all concepts in a knowledge domain with pagination.
 
         Returns organized view of all concepts in domain like
         AI_ARCHITECTURE, PROMPT_ENGINEERING, etc.
 
         Args:
             domain: Knowledge domain to browse
+            limit: Maximum number of documents to return (default: 20)
+            offset: Number of documents to skip (default: 0)
 
         Returns:
             Knowledge shelf information with documents and concepts
@@ -812,52 +682,35 @@ class CognitiveMemoryEngine:
                 domain_enum = KnowledgeDomain(domain.lower())
             except ValueError:
                 logger.warning(f"Unknown domain '{domain}', listing available domains")
-                return {
-                    "error": f"Unknown domain '{domain}'",
-                    "available_domains": [d.value for d in KnowledgeDomain],
-                    "suggestion": "Use one of the available domains listed above"
-                }
+                return {"error": f"Unknown domain '{domain}'", "available_domains": [d.value for d in KnowledgeDomain], "suggestion": "Use one of the available domains listed above"}
 
-            logger.info(f"Browsing knowledge shelf for domain {domain_enum.value}")
+            logger.info(f"Browsing knowledge shelf for domain {domain_enum.value} (limit={limit}, offset={offset})")
 
             # Get knowledge shelf
             shelf = await self.document_store.get_shelf(domain_enum)
 
-            # Get all documents in this domain
-            documents = await self.document_store.list_documents_by_domain(domain_enum)
+            # Get documents in this domain with pagination
+            documents = await self.document_store.list_documents_by_domain(domain_enum, limit=limit, offset=offset)
 
             # Build shelf information
             shelf_info = {
                 "domain": domain_enum.value,
-                "domain_name": domain_enum.value.replace('_', ' ').title(),
-                "total_documents": len(documents),
+                "domain_name": domain_enum.value.replace("_", " ").title(),
+                "total_documents": len(shelf.document_ids) if shelf else 0,
+                "returned_documents": len(documents),
+                "pagination": {"limit": limit, "offset": offset, "has_more": (offset + len(documents)) < (len(shelf.document_ids) if shelf else 0)},
                 "documents": [],
                 "featured_concepts": [],
-                "browsed_at": datetime.now().isoformat()
+                "browsed_at": datetime.now().isoformat(),
             }
 
             # Add shelf metadata if exists
             if shelf:
-                shelf_info.update({
-                    "shelf_name": shelf.name,
-                    "description": shelf.description,
-                    "tags": shelf.tags,
-                    "subcategories": shelf.subcategories,
-                    "created": shelf.created.isoformat(),
-                    "last_accessed": shelf.last_accessed.isoformat()
-                })
+                shelf_info.update({"shelf_name": shelf.name, "description": shelf.description, "tags": shelf.tags, "subcategories": shelf.subcategories, "created": shelf.created.isoformat(), "last_accessed": shelf.last_accessed.isoformat()})
 
             # Add document information
             for document in documents:
-                doc_info = {
-                    "document_id": document.doc_id,
-                    "title": document.title,
-                    "root_concept": document.root_concept,
-                    "total_concepts": document.total_concepts,
-                    "created": document.created.isoformat(),
-                    "last_accessed": document.last_accessed.isoformat(),
-                    "concepts": []
-                }
+                doc_info = {"document_id": document.doc_id, "title": document.title, "root_concept": document.root_concept, "total_concepts": document.total_concepts, "created": document.created.isoformat(), "last_accessed": document.last_accessed.isoformat(), "concepts": []}
 
                 # Add top-level concepts (direct children of root)
                 if document.root_concept_id in document.concepts:
@@ -870,17 +723,13 @@ class CognitiveMemoryEngine:
                                 "name": child_concept.name,
                                 "description": child_concept.description[:100] + "..." if len(child_concept.description) > 100 else child_concept.description,
                                 "children_count": len(child_concept.child_concept_ids),
-                                "salience_score": child_concept.salience_score
+                                "salience_score": child_concept.salience_score,
                             }
                             doc_info["concepts"].append(concept_info)
 
                             # Add to featured concepts if high salience
                             if child_concept.salience_score > 0.7:
-                                shelf_info["featured_concepts"].append({
-                                    "name": child_concept.name,
-                                    "document_title": document.title,
-                                    "salience_score": child_concept.salience_score
-                                })
+                                shelf_info["featured_concepts"].append({"name": child_concept.name, "document_title": document.title, "salience_score": child_concept.salience_score})
 
                 shelf_info["documents"].append(doc_info)
 
@@ -894,13 +743,7 @@ class CognitiveMemoryEngine:
             logger.error(f"Failed to browse knowledge shelf for domain '{domain}': {e}")
             raise CMEError(f"Knowledge shelf browsing failed: {e}") from e
 
-    async def query_memory(
-        self,
-        query: str,
-        context_depth: int = 3,
-        time_scope: str = "week",
-        max_results: int = 10
-    ) -> dict[str, Any]:
+    async def query_memory(self, query: str, context_depth: int = 3, time_scope: str = "week", max_results: int = 10) -> dict[str, Any]:
         """
         Search memory using semantic and temporal constraints.
 
@@ -925,20 +768,10 @@ class CognitiveMemoryEngine:
             # Step 1: Find relevant temporal books using themes and time scope
             temporal_scope_enum = None
             if time_scope != "all":
-                temporal_scope_map = {
-                    "hour": TemporalScale.HOUR,
-                    "day": TemporalScale.DAY,
-                    "week": TemporalScale.WEEK,
-                    "month": TemporalScale.MONTH,
-                    "year": TemporalScale.YEAR
-                }
+                temporal_scope_map = {"hour": TemporalScale.HOUR, "day": TemporalScale.DAY, "week": TemporalScale.WEEK, "month": TemporalScale.MONTH, "year": TemporalScale.YEAR}
                 temporal_scope_enum = temporal_scope_map.get(time_scope)
 
-            relevant_books = await self.temporal_organizer.get_relevant_books(
-                query,
-                temporal_scope_enum,
-                max_books=max_results
-            )
+            relevant_books = await self.temporal_organizer.get_relevant_books(query, temporal_scope_enum, max_books=max_results)
 
             logger.info(f"Found {len(relevant_books)} relevant temporal books")
 
@@ -948,7 +781,7 @@ class CognitiveMemoryEngine:
                 max_depth=context_depth,
                 temporal_scope=time_scope,
                 session_id=None,  # Cross-session query
-                strategy="hybrid"
+                strategy="hybrid",
             )
 
             # Step 3: Format results
@@ -956,16 +789,18 @@ class CognitiveMemoryEngine:
             for book in relevant_books:
                 # Get RTM trees from book
                 for tree_id in book.rtm_tree_ids[:3]:  # Limit per book
-                    results.append({
-                        "type": "temporal_book",
-                        "book_id": book.book_id,
-                        "tree_id": tree_id,
-                        "title": book.title,
-                        "themes": book.persistent_themes,
-                        "timestamp": book.last_accessed.isoformat(),
-                        "temporal_scale": book.temporal_scale.value,
-                        "relevance_score": 0.8  # TODO: Implement proper scoring
-                    })
+                    results.append(
+                        {
+                            "type": "temporal_book",
+                            "book_id": book.book_id,
+                            "tree_id": tree_id,
+                            "title": book.title,
+                            "themes": book.persistent_themes,
+                            "timestamp": book.last_accessed.isoformat(),
+                            "temporal_scale": book.temporal_scale.value,
+                            "relevance_score": 0.8,  # TODO: Implement proper scoring
+                        }
+                    )
 
             result = {
                 "query": query,
@@ -973,13 +808,8 @@ class CognitiveMemoryEngine:
                 "time_scope": time_scope,
                 "total_books_searched": len(relevant_books),
                 "results": results[:max_results],
-                "assembled_context": {
-                    "retrieved_nodes": len(context.retrieved_nodes),
-                    "temporal_books_accessed": len(context.temporal_books_accessed),
-                    "avg_salience_score": context.avg_salience_score,
-                    "retrieval_strategy": context.retrieval_strategy
-                },
-                "search_timestamp": datetime.now().isoformat()
+                "assembled_context": {"retrieved_nodes": len(context.retrieved_nodes), "temporal_books_accessed": len(context.temporal_books_accessed), "avg_salience_score": context.avg_salience_score, "retrieval_strategy": context.retrieval_strategy},
+                "search_timestamp": datetime.now().isoformat(),
             }
 
             logger.info(f"Query completed: found {len(results)} results")
@@ -989,12 +819,7 @@ class CognitiveMemoryEngine:
             logger.error(f"Error querying memory: {e}")
             raise CMEError(f"Memory query failed: {e}") from e
 
-    async def generate_response(
-        self,
-        prompt: str,
-        context_depth: int = 3,
-        response_style: str = "conversational"
-    ) -> str:
+    async def generate_response(self, prompt: str, context_depth: int = 3, response_style: str = "conversational") -> str:
         """
         Generate a contextually aware response using memory.
 
@@ -1023,24 +848,14 @@ class CognitiveMemoryEngine:
                 prompt,
                 query_analysis["context_depth"],
                 query_analysis["time_scope"],  # Fixed: time_scope not temporal_scope
-                query_analysis["max_results"]
+                query_analysis["max_results"],
             )
 
             # Step 3: Assemble context for response generation with optimal strategy
-            context = await self.context_assembler.assemble_context(
-                query=prompt,
-                max_depth=query_analysis["context_depth"],
-                temporal_scope=query_analysis["temporal_scope"],
-                strategy=query_analysis["retrieval_strategy"]
-            )
+            context = await self.context_assembler.assemble_context(query=prompt, max_depth=query_analysis["context_depth"], temporal_scope=query_analysis["temporal_scope"], strategy=query_analysis["retrieval_strategy"])
 
             # Step 3: Generate response with memory context
-            response = await self.response_generator.generate_response(
-                query=prompt,
-                context=context,
-                include_social_context=True,
-                response_type=response_style
-            )
+            response = await self.response_generator.generate_response(query=prompt, context=context, include_social_context=True, response_type=response_style)
 
             logger.info(f"Generated response ({response.confidence:.2f} confidence)")
             return response.content
@@ -1071,62 +886,60 @@ class CognitiveMemoryEngine:
         recent_patterns = ["today", "yesterday", "recent", "latest", "current", "now"]
 
         # Default parameters (original behavior)
-        analysis = {
-            "context_depth": 3,
-            "temporal_scope": "week",
-            "max_results": 5,
-            "retrieval_strategy": "hybrid",
-            "query_type": "general"
-        }
+        analysis = {"context_depth": 3, "temporal_scope": "week", "max_results": 5, "retrieval_strategy": "hybrid", "query_type": "general"}
 
         # Debugging queries - look for recent similar problems and solutions
         if any(pattern in prompt_lower for pattern in debugging_patterns):
-            analysis.update({
-                "context_depth": 4,  # Deeper context for troubleshooting
-                "temporal_scope": "month",  # Look back further for similar issues
-                "max_results": 8,  # More examples of solutions
-                "retrieval_strategy": "hybrid",
-                "query_type": "debugging"
-            })
+            analysis.update(
+                {
+                    "context_depth": 4,  # Deeper context for troubleshooting
+                    "temporal_scope": "month",  # Look back further for similar issues
+                    "max_results": 8,  # More examples of solutions
+                    "retrieval_strategy": "hybrid",
+                    "query_type": "debugging",
+                }
+            )
 
         # Implementation queries - find proven patterns and approaches
         elif any(pattern in prompt_lower for pattern in implementation_patterns):
-            analysis.update({
-                "context_depth": 5,  # Deep context for implementation details
-                "temporal_scope": "all",  # Look for all proven patterns
-                "max_results": 7,  # Multiple implementation examples
-                "retrieval_strategy": "hybrid",
-                "query_type": "implementation"
-            })
+            analysis.update(
+                {
+                    "context_depth": 5,  # Deep context for implementation details
+                    "temporal_scope": "all",  # Look for all proven patterns
+                    "max_results": 7,  # Multiple implementation examples
+                    "retrieval_strategy": "hybrid",
+                    "query_type": "implementation",
+                }
+            )
 
         # Research queries - broad knowledge retrieval
         elif any(pattern in prompt_lower for pattern in research_patterns):
-            analysis.update({
-                "context_depth": 3,
-                "temporal_scope": "all",  # All available knowledge
-                "max_results": 10,  # Comprehensive information
-                "retrieval_strategy": "hybrid",
-                "query_type": "research"
-            })
+            analysis.update(
+                {
+                    "context_depth": 3,
+                    "temporal_scope": "all",  # All available knowledge
+                    "max_results": 10,  # Comprehensive information
+                    "retrieval_strategy": "hybrid",
+                    "query_type": "research",
+                }
+            )
 
         # Recent/temporal queries - focus on recency
         elif any(pattern in prompt_lower for pattern in recent_patterns):
-            analysis.update({
-                "context_depth": 2,
-                "temporal_scope": "day",  # Very recent focus
-                "max_results": 5,
-                "retrieval_strategy": "hybrid",
-                "query_type": "recent"
-            })
+            analysis.update(
+                {
+                    "context_depth": 2,
+                    "temporal_scope": "day",  # Very recent focus
+                    "max_results": 5,
+                    "retrieval_strategy": "hybrid",
+                    "query_type": "recent",
+                }
+            )
 
         logger.info(f"Query analysis: {analysis['query_type']} -> scope: {analysis['temporal_scope']}, depth: {analysis['context_depth']}")
         return analysis
 
-    async def analyze_conversation(
-        self,
-        conversation_id: str | None = None,
-        analysis_type: str = "all"
-    ) -> dict[str, Any]:
+    async def analyze_conversation(self, conversation_id: str | None = None, analysis_type: str = "all") -> dict[str, Any]:
         """
         Perform deep analysis of conversation patterns.
 
@@ -1151,19 +964,11 @@ class CognitiveMemoryEngine:
                 conversation_data = recent_conversations[0]
                 conversation_id = conversation_data.get("id", "unknown")
 
-            analysis = {
-                "conversation_id": conversation_id,
-                "analysis_type": analysis_type,
-                "timestamp": datetime.now().isoformat()
-            }
+            analysis = {"conversation_id": conversation_id, "analysis_type": analysis_type, "timestamp": datetime.now().isoformat()}
 
             if analysis_type in ["narrative", "all"]:
                 # TODO: Implement narrative analysis
-                analysis["narrative"] = {
-                    "structure": "hierarchical_rtm",
-                    "depth": 3,
-                    "themes": ["project", "timeline", "technical"]
-                }
+                analysis["narrative"] = {"structure": "hierarchical_rtm", "depth": 3, "themes": ["project", "timeline", "technical"]}
 
             if analysis_type in ["temporal", "all"]:
                 # Get temporal organization stats
@@ -1172,11 +977,7 @@ class CognitiveMemoryEngine:
 
             if analysis_type in ["semantic", "all"]:
                 # TODO: Implement semantic analysis
-                analysis["semantic"] = {
-                    "embedding_dimensions": 384,
-                    "semantic_clusters": 5,
-                    "topic_coherence": 0.75
-                }
+                analysis["semantic"] = {"embedding_dimensions": 384, "semantic_clusters": 5, "topic_coherence": 0.75}
 
             logger.info(f"Completed {analysis_type} analysis for {conversation_id}")
             return analysis
@@ -1203,11 +1004,7 @@ class CognitiveMemoryEngine:
         self._ensure_component(self.temporal_library, "temporal_library")
 
         try:
-            stats = {
-                "engine_status": "initialized",
-                "timestamp": datetime.now().isoformat(),
-                "active_sessions": len(self.active_sessions)
-            }
+            stats = {"engine_status": "initialized", "timestamp": datetime.now().isoformat(), "active_sessions": len(self.active_sessions)}
 
             # Vector store stats
             if self.vector_store:
@@ -1222,17 +1019,8 @@ class CognitiveMemoryEngine:
             if include_details and self.narrative_builder and self.response_generator:
                 # Component details
                 stats["components"] = {
-                    "narrative_builder": {
-                        "llm_model": self.narrative_builder.llm_model,
-                        "rtm_config": {
-                            "max_branching_factor": self.narrative_builder.config.max_branching_factor,
-                            "max_recall_depth": self.narrative_builder.config.max_recall_depth
-                        }
-                    },
-                    "response_generator": {
-                        "llm_model": self.response_generator.llm_model,
-                        "generation_stats": self.response_generator.generation_stats
-                    }
+                    "narrative_builder": {"llm_model": self.narrative_builder.llm_model, "rtm_config": {"max_branching_factor": self.narrative_builder.config.max_branching_factor, "max_recall_depth": self.narrative_builder.config.max_recall_depth}},
+                    "response_generator": {"llm_model": self.response_generator.llm_model, "generation_stats": self.response_generator.generation_stats},
                 }
 
             return stats
@@ -1258,14 +1046,7 @@ class CognitiveMemoryEngine:
             conversations = []
             for book in books[:limit]:
                 for tree_id in book.rtm_tree_ids:
-                    conversations.append({
-                        "id": tree_id,
-                        "book_id": book.book_id,
-                        "title": book.title,
-                        "timestamp": book.last_accessed.isoformat(),
-                        "themes": book.persistent_themes,
-                        "temporal_scale": book.temporal_scale.value
-                    })
+                    conversations.append({"id": tree_id, "book_id": book.book_id, "title": book.title, "timestamp": book.last_accessed.isoformat(), "themes": book.persistent_themes, "temporal_scale": book.temporal_scale.value})
 
                     if len(conversations) >= limit:
                         break
@@ -1300,20 +1081,9 @@ class CognitiveMemoryEngine:
         self._ensure_component(self.context_assembler, "context_assembler")
 
         # Assemble context for a generic, recent query
-        context = await self.context_assembler.assemble_context(
-            query="What is the current status?",
-            max_depth=2,
-            temporal_scope="day",
-            strategy="hybrid"
-        )
+        context = await self.context_assembler.assemble_context(query="What is the current status?", max_depth=2, temporal_scope="day", strategy="hybrid")
 
-        return {
-            "active_sessions": len(self.active_sessions),
-            "last_updated": datetime.now().isoformat(),
-            "context_assembly_ready": True,
-            "retrieved_nodes": len(context.retrieved_nodes),
-            "avg_salience_score": context.avg_salience_score
-        }
+        return {"active_sessions": len(self.active_sessions), "last_updated": datetime.now().isoformat(), "context_assembly_ready": True, "retrieved_nodes": len(context.retrieved_nodes), "avg_salience_score": context.avg_salience_score}
 
     async def cleanup(self) -> None:
         """Clean up resources."""

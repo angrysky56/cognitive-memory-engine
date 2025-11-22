@@ -33,11 +33,7 @@ if TYPE_CHECKING:
     )
 
 # Configure logging to stderr for MCP servers
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stderr
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
 
@@ -60,12 +56,12 @@ def serialize_complex_objects(obj):
             return obj.value
 
         # Handle objects with dict() method (Pydantic models)
-        if hasattr(obj, 'dict') and callable(obj.dict):
+        if hasattr(obj, "dict") and callable(obj.dict):
             return obj.dict()
 
         # Handle objects with __dict__ attribute
-        if hasattr(obj, '__dict__'):
-            return {k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
+        if hasattr(obj, "__dict__"):
+            return {k: v for k, v in obj.__dict__.items() if not k.startswith("_")}
 
         # Fallback to string representation
         return str(obj)
@@ -74,22 +70,27 @@ def serialize_complex_objects(obj):
         logger.warning(f"Failed to serialize object {type(obj)}: {e}")
         return str(obj)
 
+
 # Enhanced Knowledge Tools Integration
 enhanced_tools_available = False
 enhanced_tools = None
+
 
 def import_enhanced_tools():
     """Safely import enhanced knowledge tools."""
     global enhanced_tools_available
     try:
         from pathlib import Path
+
         enhanced_tools_path = Path(__file__).parent.parent.parent.parent / "enhanced_knowledge_tools"
         if enhanced_tools_path.exists():
             import sys
+
             sys.path.insert(0, str(enhanced_tools_path))
             from cognitive_memory_engine.mcp_server.enhanced_server_tools import (
                 EnhancedKnowledgeServerTools,
             )
+
             enhanced_tools_available = True
             logger.info("Enhanced knowledge tools imported successfully")
             return EnhancedKnowledgeServerTools
@@ -102,6 +103,7 @@ def import_enhanced_tools():
     except Exception as e:
         logger.error(f"Error importing enhanced knowledge tools: {e}")
         return None
+
 
 # Global engine instance
 engine: CognitiveMemoryEngine | None = None
@@ -162,7 +164,7 @@ async def _connect_mcp_tools_to_enhanced(enhanced_tools_instance):
         # These would be the actual MCP tool handlers available in the server
         available_tools = {
             "web_search": None,  # Would connect to actual web_search tool
-            "web_fetch": None,   # Would connect to actual web_fetch tool
+            "web_fetch": None,  # Would connect to actual web_fetch tool
             "mcp-server-firecrawl:firecrawl_search": None,
             "mcp-server-firecrawl:firecrawl_scrape": None,
         }
@@ -178,11 +180,11 @@ async def _connect_mcp_tools_to_enhanced(enhanced_tools_instance):
         logger.info(f"Connected {connected_count} MCP tools to enhanced knowledge system")
 
         # Set integration features based on available tools
-        if hasattr(enhanced_tools_instance, 'integration_features'):
+        if hasattr(enhanced_tools_instance, "integration_features"):
             enhanced_tools_instance.integration_features = {
                 "fetch_enabled": connected_count > 0,
                 "context_enhanced": True,  # Context enhancement is always available
-                "enhanced_tools_available": True
+                "enhanced_tools_available": True,
             }
 
     except Exception as e:
@@ -310,14 +312,16 @@ async def handle_read_resource(uri: AnyUrl) -> str:
             if cme.document_store:
                 all_docs = await cme.document_store.get_all_documents()
                 for doc in all_docs:
-                    all_docs_summary.append({
-                        "document_id": doc.doc_id,
-                        "title": doc.title,
-                        "root_concept": doc.root_concept,
-                        "domain": doc.domain.value,
-                        "total_concepts": doc.total_concepts,
-                        "created": doc.created.isoformat(),
-                    })
+                    all_docs_summary.append(
+                        {
+                            "document_id": doc.doc_id,
+                            "title": doc.title,
+                            "root_concept": doc.root_concept,
+                            "domain": doc.domain.value,
+                            "total_concepts": doc.total_concepts,
+                            "created": doc.created.isoformat(),
+                        }
+                    )
             return json.dumps(all_docs_summary, indent=2, default=serialize_complex_objects)
 
         elif uri_str == "cme://memory/concepts":
@@ -326,22 +330,20 @@ async def handle_read_resource(uri: AnyUrl) -> str:
                 all_docs = await cme.document_store.get_all_documents()
                 for doc in all_docs:
                     for _concept_id, concept in doc.concepts.items():
-                        all_concepts_summary.append({
-                            "concept_id": concept.concept_id,
-                            "name": concept.name,
-                            "description": concept.description[:150] + "..." if len(concept.description) > 150 else concept.description,
-                            "document_id": doc.doc_id,
-                            "domain": doc.domain.value,
-                        })
+                        all_concepts_summary.append(
+                            {
+                                "concept_id": concept.concept_id,
+                                "name": concept.name,
+                                "description": concept.description[:150] + "..." if len(concept.description) > 150 else concept.description,
+                                "document_id": doc.doc_id,
+                                "domain": doc.domain.value,
+                            }
+                        )
             return json.dumps(all_concepts_summary, indent=2, default=serialize_complex_objects)
 
         elif uri_str == "cme://memory/cross_references":
             # Retrieve all cross-references from the store
-            cross_refs_data = {
-                "cross_references": [],
-                "statistics": {},
-                "status": "success"
-            }
+            cross_refs_data = {"cross_references": [], "statistics": {}, "status": "success"}
 
             if cme.cross_reference_store:
                 # Get all links with minimum confidence
@@ -349,18 +351,20 @@ async def handle_read_resource(uri: AnyUrl) -> str:
 
                 # Convert to serializable format
                 for link in all_links[:50]:  # Limit to 50 for performance
-                    cross_refs_data["cross_references"].append({
-                        "link_id": link.link_id,
-                        "conversation_tree_id": link.conversation_tree_id,
-                        "conversation_node_id": link.conversation_node_id,
-                        "document_concept_id": link.document_concept_id,
-                        "document_id": link.document_id,
-                        "relationship_type": link.relationship_type.value,
-                        "confidence_score": link.confidence_score,
-                        "context_snippet": link.context_snippet,
-                        "created": link.created.isoformat(),
-                        "metadata": link.metadata
-                    })
+                    cross_refs_data["cross_references"].append(
+                        {
+                            "link_id": link.link_id,
+                            "conversation_tree_id": link.conversation_tree_id,
+                            "conversation_node_id": link.conversation_node_id,
+                            "document_concept_id": link.document_concept_id,
+                            "document_id": link.document_id,
+                            "relationship_type": link.relationship_type.value,
+                            "confidence_score": link.confidence_score,
+                            "context_snippet": link.context_snippet,
+                            "created": link.created.isoformat(),
+                            "metadata": link.metadata,
+                        }
+                    )
 
                 # Get statistics
                 stats = cme.cross_reference_store.get_statistics()
@@ -393,11 +397,7 @@ async def handle_read_resource(uri: AnyUrl) -> str:
 
     except Exception as e:
         logger.error(f"Error reading resource {uri}: {e}")
-        error_response = {
-            "error": str(e),
-            "uri": str(uri),
-            "timestamp": datetime.now().isoformat()
-        }
+        error_response = {"error": str(e), "uri": str(uri), "timestamp": datetime.now().isoformat()}
         return json.dumps(error_response, indent=2)
 
 
@@ -414,27 +414,11 @@ async def handle_list_tools() -> list[types.Tool]:
                     "conversation": {
                         "type": "array",
                         "description": "Array of conversation messages",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "role": {"type": "string", "enum": ["user", "assistant", "system"]},
-                                "content": {"type": "string"},
-                                "timestamp": {"type": "string", "format": "date-time", "description": "Optional timestamp"}
-                            },
-                            "required": ["role", "content"]
-                        }
+                        "items": {"type": "object", "properties": {"role": {"type": "string", "enum": ["user", "assistant", "system"]}, "content": {"type": "string"}, "timestamp": {"type": "string", "format": "date-time", "description": "Optional timestamp"}}, "required": ["role", "content"]},
                     },
-                    "context": {
-                        "type": "object",
-                        "description": "Additional context metadata",
-                        "properties": {
-                            "topic": {"type": "string"},
-                            "participants": {"type": "array", "items": {"type": "string"}},
-                            "importance": {"type": "number", "minimum": 0, "maximum": 1}
-                        }
-                    }
+                    "context": {"type": "object", "description": "Additional context metadata", "properties": {"topic": {"type": "string"}, "participants": {"type": "array", "items": {"type": "string"}}, "importance": {"type": "number", "minimum": 0, "maximum": 1}}},
                 },
-                "required": ["conversation"]
+                "required": ["conversation"],
             },
         ),
         types.Tool(
@@ -443,32 +427,12 @@ async def handle_list_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Natural language query for memory search"
-                    },
-                    "context_depth": {
-                        "type": "integer",
-                        "description": "RTM tree traversal depth (1-10)",
-                        "minimum": 1,
-                        "maximum": 10,
-                        "default": 3
-                    },
-                    "time_scope": {
-                        "type": "string",
-                        "description": "Temporal scope for search",
-                        "enum": ["hour", "day", "week", "month", "year", "all"],
-                        "default": "week"
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "description": "Maximum number of results to return",
-                        "minimum": 1,
-                        "maximum": 100,
-                        "default": 10
-                    }
+                    "query": {"type": "string", "description": "Natural language query for memory search"},
+                    "context_depth": {"type": "integer", "description": "RTM tree traversal depth (1-10)", "minimum": 1, "maximum": 10, "default": 3},
+                    "time_scope": {"type": "string", "description": "Temporal scope for search", "enum": ["hour", "day", "week", "month", "year", "all"], "default": "week"},
+                    "max_results": {"type": "integer", "description": "Maximum number of results to return", "minimum": 1, "maximum": 100, "default": 10},
                 },
-                "required": ["query"]
+                "required": ["query"],
             },
         ),
         types.Tool(
@@ -477,25 +441,11 @@ async def handle_list_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "prompt": {
-                        "type": "string",
-                        "description": "Input prompt for response generation"
-                    },
-                    "context_depth": {
-                        "type": "integer",
-                        "description": "Memory context depth to include",
-                        "minimum": 1,
-                        "maximum": 10,
-                        "default": 3
-                    },
-                    "response_style": {
-                        "type": "string",
-                        "description": "Style of response to generate",
-                        "enum": ["analytical", "conversational", "technical", "creative"],
-                        "default": "conversational"
-                    }
+                    "prompt": {"type": "string", "description": "Input prompt for response generation"},
+                    "context_depth": {"type": "integer", "description": "Memory context depth to include", "minimum": 1, "maximum": 10, "default": 3},
+                    "response_style": {"type": "string", "description": "Style of response to generate", "enum": ["analytical", "conversational", "technical", "creative"], "default": "conversational"},
                 },
-                "required": ["prompt"]
+                "required": ["prompt"],
             },
         ),
         types.Tool(
@@ -504,92 +454,36 @@ async def handle_list_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "conversation_id": {
-                        "type": "string",
-                        "description": "ID of conversation to analyze (optional, analyzes recent if not provided)"
-                    },
-                    "analysis_type": {
-                        "type": "string",
-                        "description": "Type of analysis to perform",
-                        "enum": ["narrative", "temporal", "semantic", "social", "all"],
-                        "default": "all"
-                    }
+                    "conversation_id": {"type": "string", "description": "ID of conversation to analyze (optional, analyzes recent if not provided)"},
+                    "analysis_type": {"type": "string", "description": "Type of analysis to perform", "enum": ["narrative", "temporal", "semantic", "social", "all"], "default": "all"},
                 },
-                "required": []
+                "required": [],
             },
         ),
         types.Tool(
             name="get_memory_stats",
             description="Get statistics and insights about the memory system",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "include_details": {
-                        "type": "boolean",
-                        "description": "Include detailed breakdown of memory components",
-                        "default": False
-                    }
-                },
-                "required": []
-            },
+            inputSchema={"type": "object", "properties": {"include_details": {"type": "boolean", "description": "Include detailed breakdown of memory components", "default": False}}, "required": []},
         ),
         types.Tool(
             name="get_rtm_tree_details",
             description="Get detailed information about a specific RTM tree",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "tree_id": {
-                        "type": "string",
-                        "description": "ID of the RTM tree to retrieve details for"
-                    }
-                },
-                "required": ["tree_id"]
-            },
+            inputSchema={"type": "object", "properties": {"tree_id": {"type": "string", "description": "ID of the RTM tree to retrieve details for"}}, "required": ["tree_id"]},
         ),
         types.Tool(
             name="get_vector_store_details",
             description="Get detailed statistics and configuration of the vector store",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "include_details": {
-                        "type": "boolean",
-                        "description": "Include detailed breakdown of vector store components",
-                        "default": False
-                    }
-                },
-                "required": []
-            },
+            inputSchema={"type": "object", "properties": {"include_details": {"type": "boolean", "description": "Include detailed breakdown of vector store components", "default": False}}, "required": []},
         ),
         types.Tool(
             name="get_task_status",
             description="Get the status of a background task",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "string",
-                        "description": "ID of the task to check"
-                    }
-                },
-                "required": ["task_id"]
-            },
+            inputSchema={"type": "object", "properties": {"task_id": {"type": "string", "description": "ID of the task to check"}}, "required": ["task_id"]},
         ),
         types.Tool(
             name="list_tasks",
             description="List all background tasks and their status",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "status_filter": {
-                        "type": "string",
-                        "description": "Filter tasks by status (pending, running, completed, failed, all)",
-                        "default": "all"
-                    }
-                },
-                "required": []
-            },
+            inputSchema={"type": "object", "properties": {"status_filter": {"type": "string", "description": "Filter tasks by status (pending, running, completed, failed, all)", "default": "all"}}, "required": []},
         ),
         types.Tool(
             name="store_document_knowledge",
@@ -597,72 +491,33 @@ async def handle_list_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "document_content": {
-                        "type": "string",
-                        "description": "The document content to store (optional if source_url provided)"
-                    },
-                    "source_url": {
-                        "type": "string",
-                        "description": "URL to fetch content from (optional if document_content provided)"
-                    },
-                    "root_concept": {
-                        "type": "string",
-                        "description": "Main concept of the document"
-                    },
-                    "domain": {
-                        "type": "string",
-                        "description": "Knowledge domain",
-                        "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]
-                    },
-                    "use_fetch_enhanced_context": {
-                        "type": "boolean",
-                        "description": "Whether to use fetch-enhanced context for processing (leverages real-time data)",
-                        "default": False
-                    },
-                    "metadata": {
-                        "type": "object",
-                        "description": "Optional metadata for the document",
-                        "properties": {
-                            "source": {"type": "string"},
-                            "version": {"type": "string"},
-                            "authors": {"type": "array", "items": {"type": "string"}}
-                        }
-                    }
+                    "document_content": {"type": "string", "description": "The document content to store (optional if source_url provided)"},
+                    "source_url": {"type": "string", "description": "URL to fetch content from (optional if document_content provided)"},
+                    "root_concept": {"type": "string", "description": "Main concept of the document"},
+                    "domain": {"type": "string", "description": "Knowledge domain", "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]},
+                    "use_fetch_enhanced_context": {"type": "boolean", "description": "Whether to use fetch-enhanced context for processing (leverages real-time data)", "default": False},
+                    "metadata": {"type": "object", "description": "Optional metadata for the document", "properties": {"source": {"type": "string"}, "version": {"type": "string"}, "authors": {"type": "array", "items": {"type": "string"}}}},
                 },
                 "required": ["root_concept", "domain"],
-                "anyOf": [
-                    {"required": ["document_content"]},
-                    {"required": ["source_url"]}
-                ]
+                "anyOf": [{"required": ["document_content"]}, {"required": ["source_url"]}],
             },
         ),
         types.Tool(
             name="get_concept",
             description="Retrieve specific concept from document knowledge",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "concept_name": {
-                        "type": "string",
-                        "description": "Name of concept to retrieve"
-                    }
-                },
-                "required": ["concept_name"]
-            },
+            inputSchema={"type": "object", "properties": {"concept_name": {"type": "string", "description": "Name of concept to retrieve"}}, "required": ["concept_name"]},
         ),
         types.Tool(
             name="browse_knowledge_shelf",
-            description="Browse concepts in a knowledge domain",
+            description="Browse concepts in a knowledge domain with pagination",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "domain": {
-                        "type": "string",
-                        "description": "Knowledge domain to browse",
-                        "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]
-                    }
+                    "domain": {"type": "string", "description": "Knowledge domain to browse", "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]},
+                    "limit": {"type": "integer", "description": "Maximum number of documents to return", "default": 20, "minimum": 1, "maximum": 100},
+                    "offset": {"type": "integer", "description": "Number of documents to skip", "default": 0, "minimum": 0},
                 },
-                "required": ["domain"]
+                "required": ["domain"],
             },
         ),
         types.Tool(
@@ -671,73 +526,32 @@ async def handle_list_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Natural language query"
-                    },
-                    "include_formal": {
-                        "type": "boolean",
-                        "description": "Include formal document knowledge",
-                        "default": True
-                    },
-                    "include_conversational": {
-                        "type": "boolean",
-                        "description": "Include conversation insights",
-                        "default": True
-                    }
+                    "query": {"type": "string", "description": "Natural language query"},
+                    "include_formal": {"type": "boolean", "description": "Include formal document knowledge", "default": True},
+                    "include_conversational": {"type": "boolean", "description": "Include conversation insights", "default": True},
                 },
-                "required": ["query"]
+                "required": ["query"],
             },
         ),
         types.Tool(
             name="link_conversation_to_knowledge",
             description="Create cross-references between conversation and document knowledge",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "conversation_id": {
-                        "type": "string",
-                        "description": "ID of conversation to analyze for concept mentions"
-                    },
-                    "document_concept_id": {
-                        "type": "string",
-                        "description": "Optional specific concept to link to"
-                    }
-                },
-                "required": ["conversation_id"]
-            },
+            inputSchema={"type": "object", "properties": {"conversation_id": {"type": "string", "description": "ID of conversation to analyze for concept mentions"}, "document_concept_id": {"type": "string", "description": "Optional specific concept to link to"}}, "required": ["conversation_id"]},
         ),
         types.Tool(
             name="get_available_models",
             description="Get a list of available models from the provider.",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            },
+            inputSchema={"type": "object", "properties": {}, "required": []},
         ),
         types.Tool(
             name="get_current_model",
             description="Get the currently selected model.",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            },
+            inputSchema={"type": "object", "properties": {}, "required": []},
         ),
         types.Tool(
             name="set_model",
             description="Set the model to use for generation.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "model_name": {
-                        "type": "string",
-                        "description": "The name of the model to set."
-                    }
-                },
-                "required": ["model_name"]
-            },
+            inputSchema={"type": "object", "properties": {"model_name": {"type": "string", "description": "The name of the model to set."}}, "required": ["model_name"]},
         ),
         # Enhanced Knowledge Tools
         types.Tool(
@@ -748,15 +562,11 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "url": {"type": "string", "description": "URL to fetch content from"},
                     "root_concept": {"type": "string", "description": "Main concept name"},
-                    "domain": {
-                        "type": "string",
-                        "description": "Knowledge domain",
-                        "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]
-                    },
+                    "domain": {"type": "string", "description": "Knowledge domain", "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]},
                     "merge_with_existing": {"type": "boolean", "description": "Whether to merge with existing concepts", "default": True},
-                    "metadata": {"type": "object", "description": "Additional metadata"}
+                    "metadata": {"type": "object", "description": "Additional metadata"},
                 },
-                "required": ["url", "root_concept", "domain"]
+                "required": ["url", "root_concept", "domain"],
             },
         ),
         types.Tool(
@@ -767,16 +577,12 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "search_query": {"type": "string", "description": "Search query to execute"},
                     "root_concept": {"type": "string", "description": "Main concept name"},
-                    "domain": {
-                        "type": "string",
-                        "description": "Knowledge domain",
-                        "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]
-                    },
+                    "domain": {"type": "string", "description": "Knowledge domain", "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]},
                     "max_results": {"type": "integer", "description": "Maximum number of search results", "default": 3, "minimum": 1, "maximum": 10},
                     "merge_with_existing": {"type": "boolean", "description": "Whether to merge with existing concepts", "default": True},
-                    "metadata": {"type": "object", "description": "Additional metadata"}
+                    "metadata": {"type": "object", "description": "Additional metadata"},
                 },
-                "required": ["search_query", "root_concept", "domain"]
+                "required": ["search_query", "root_concept", "domain"],
             },
         ),
         types.Tool(
@@ -786,21 +592,13 @@ async def handle_list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {
                     "concept_name": {"type": "string", "description": "Name of existing concept to enhance"},
-                    "domain": {
-                        "type": "string",
-                        "description": "Knowledge domain",
-                        "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]
-                    },
-                    "enhancement_sources": {
-                        "type": "array",
-                        "description": "List of URLs, search queries, or file paths",
-                        "items": {"type": "string"}
-                    },
-                    "source_type": {"type": "string", "description": "Type of sources", "enum": ["url", "search", "file", "auto"], "default": "auto"}
+                    "domain": {"type": "string", "description": "Knowledge domain", "enum": ["ai_architecture", "prompt_engineering", "neural_networks", "cognitive_science", "software_engineering", "research_methods", "machine_learning", "natural_language_processing", "general_knowledge"]},
+                    "enhancement_sources": {"type": "array", "description": "List of URLs, search queries, or file paths", "items": {"type": "string"}},
+                    "source_type": {"type": "string", "description": "Type of sources", "enum": ["url", "search", "file", "auto"], "default": "auto"},
                 },
-                "required": ["concept_name", "domain", "enhancement_sources"]
+                "required": ["concept_name", "domain", "enhancement_sources"],
             },
-        )
+        ),
     ]
 
 
@@ -816,33 +614,19 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
 
             try:
                 # Create a task for background processing
-                task_id = task_manager.create_task(
-                    description=f"Storing conversation with {len(conversation)} messages"
-                )
+                task_id = task_manager.create_task(description=f"Storing conversation with {len(conversation)} messages")
 
                 # Start background processing
-                await task_manager.start_background_task(
-                    task_id,
-                    cme.store_conversation,
-                    conversation,
-                    context
-                )
+                await task_manager.start_background_task(task_id, cme.store_conversation, conversation, context)
 
                 # Return immediately with task info
-                response = create_immediate_response(
-                    task_id,
-                    f"Processing conversation with {len(conversation)} messages"
-                )
+                response = create_immediate_response(task_id, f"Processing conversation with {len(conversation)} messages")
 
                 return [types.TextContent(type="text", text=json.dumps(response, indent=2))]
 
             except Exception as e:
                 logger.error(f"Error starting conversation storage: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to start conversation storage: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to start conversation storage: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "query_memory":
@@ -852,21 +636,12 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             max_results = arguments.get("max_results", 10)
 
             try:
-                results = await cme.query_memory(
-                    query=query,
-                    context_depth=context_depth,
-                    time_scope=time_scope,
-                    max_results=max_results
-                )
+                results = await cme.query_memory(query=query, context_depth=context_depth, time_scope=time_scope, max_results=max_results)
                 response_text = json.dumps(results, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in query_memory: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to query memory: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to query memory: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "generate_response":
@@ -875,19 +650,11 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             response_style = arguments.get("response_style", "conversational")
 
             try:
-                response = await cme.generate_response(
-                    prompt=prompt,
-                    context_depth=context_depth,
-                    response_style=response_style
-                )
+                response = await cme.generate_response(prompt=prompt, context_depth=context_depth, response_style=response_style)
                 return [types.TextContent(type="text", text=response)]
             except Exception as e:
                 logger.error(f"Error in generate_response: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to generate response: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to generate response: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "analyze_conversation":
@@ -895,19 +662,12 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             analysis_type = arguments.get("analysis_type", "all")
 
             try:
-                analysis = await cme.analyze_conversation(
-                    conversation_id=conversation_id,
-                    analysis_type=analysis_type
-                )
+                analysis = await cme.analyze_conversation(conversation_id=conversation_id, analysis_type=analysis_type)
                 response_text = json.dumps(analysis, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in analyze_conversation: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to analyze conversation: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to analyze conversation: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "get_memory_stats":
@@ -919,11 +679,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in get_memory_stats: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to get memory stats: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to get memory stats: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "get_rtm_tree_details":
@@ -937,11 +693,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                     raise CMEError("RTM store not initialized.")
             except Exception as e:
                 logger.error(f"Error in get_rtm_tree_details: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to get RTM tree details: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to get RTM tree details: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "get_vector_store_details":
@@ -953,11 +705,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in get_vector_store_details: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to get vector store details: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to get vector store details: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "get_task_status":
@@ -967,19 +715,11 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 if task_info:
                     response = task_info.to_dict()
                 else:
-                    response = {
-                        "status": "error",
-                        "error": f"Task {task_id} not found",
-                        "timestamp": datetime.now().isoformat()
-                    }
+                    response = {"status": "error", "error": f"Task {task_id} not found", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(response, indent=2))]
             except Exception as e:
                 logger.error(f"Error in get_task_status: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to get task status: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to get task status: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "list_tasks":
@@ -989,30 +729,17 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
 
                 if status_filter != "all":
                     # Filter by status
-                    filtered_tasks = {
-                        task_id: task_info
-                        for task_id, task_info in all_tasks.items()
-                        if task_info.status.value == status_filter
-                    }
+                    filtered_tasks = {task_id: task_info for task_id, task_info in all_tasks.items() if task_info.status.value == status_filter}
                 else:
                     filtered_tasks = all_tasks
 
                 # Convert to serializable format
-                response = {
-                    "total_tasks": len(filtered_tasks),
-                    "status_filter": status_filter,
-                    "tasks": [task_info.to_dict() for task_info in filtered_tasks.values()],
-                    "timestamp": datetime.now().isoformat()
-                }
+                response = {"total_tasks": len(filtered_tasks), "status_filter": status_filter, "tasks": [task_info.to_dict() for task_info in filtered_tasks.values()], "timestamp": datetime.now().isoformat()}
 
                 return [types.TextContent(type="text", text=json.dumps(response, indent=2))]
             except Exception as e:
                 logger.error(f"Error in list_tasks: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to list tasks: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to list tasks: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "get_available_models":
@@ -1022,11 +749,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in get_available_models: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to get available models: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to get available models: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "get_current_model":
@@ -1036,11 +759,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in get_current_model: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to get current model: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to get current model: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "store_document_knowledge":
@@ -1063,28 +782,15 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                             metadata["fetched_at"] = datetime.now().isoformat()
                         except Exception as fetch_error:
                             logger.warning(f"Failed to fetch from URL, proceeding with error: {fetch_error}")
-                            error_response = {
-                                "status": "error",
-                                "error": f"Failed to fetch content from URL: {str(fetch_error)}",
-                                "url": source_url,
-                                "timestamp": datetime.now().isoformat()
-                            }
+                            error_response = {"status": "error", "error": f"Failed to fetch content from URL: {str(fetch_error)}", "url": source_url, "timestamp": datetime.now().isoformat()}
                             return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
                     else:
-                        error_response = {
-                            "status": "error",
-                            "error": "Enhanced tools not available for URL fetching",
-                            "timestamp": datetime.now().isoformat()
-                        }
+                        error_response = {"status": "error", "error": "Enhanced tools not available for URL fetching", "timestamp": datetime.now().isoformat()}
                         return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
                 # Ensure we have content to process
                 if not document_content:
-                    error_response = {
-                        "status": "error",
-                        "error": "Either document_content or source_url must be provided",
-                        "timestamp": datetime.now().isoformat()
-                    }
+                    error_response = {"status": "error", "error": "Either document_content or source_url must be provided", "timestamp": datetime.now().isoformat()}
                     return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
                 # If fetch-enhanced context is requested, pre-process through context assembler
@@ -1095,7 +801,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                         enhanced_context = await cme.context_assembler.assemble_context(
                             query=f"Related information for {root_concept} in {domain}",
                             strategy="fetch_enhanced",
-                            max_depth=2  # Limit traversal depth for processing
+                            max_depth=2,  # Limit traversal depth for processing
                         )
 
                         # Add context enrichment note to metadata
@@ -1110,30 +816,17 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                         metadata["context_enhancement_failed"] = str(context_error)
 
                 # Store the document knowledge
-                result = await cme.store_document_knowledge(
-                    document_content=document_content,
-                    root_concept=root_concept,
-                    domain=domain,
-                    metadata=metadata
-                )
+                result = await cme.store_document_knowledge(document_content=document_content, root_concept=root_concept, domain=domain, metadata=metadata)
 
                 # Add integration info to response
-                result["integration_features"] = {
-                    "fetch_enabled": source_url is not None,
-                    "context_enhanced": use_fetch_enhanced_context,
-                    "enhanced_tools_available": cme.context_assembler.enhanced_knowledge_tools is not None if cme.context_assembler else False
-                }
+                result["integration_features"] = {"fetch_enabled": source_url is not None, "context_enhanced": use_fetch_enhanced_context, "enhanced_tools_available": cme.context_assembler.enhanced_knowledge_tools is not None if cme.context_assembler else False}
 
                 response_text = json.dumps(result, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
 
             except Exception as e:
                 logger.error(f"Error in store_document_knowledge: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to store document knowledge: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to store document knowledge: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "get_concept":
@@ -1144,37 +837,26 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 if concept:
                     response_text = json.dumps(concept, indent=2, default=serialize_complex_objects)
                 else:
-                    response = {
-                        "status": "not_found",
-                        "concept_name": concept_name,
-                        "message": f"Concept '{concept_name}' not found in document knowledge",
-                        "timestamp": datetime.now().isoformat()
-                    }
+                    response = {"status": "not_found", "concept_name": concept_name, "message": f"Concept '{concept_name}' not found in document knowledge", "timestamp": datetime.now().isoformat()}
                     response_text = json.dumps(response, indent=2)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in get_concept: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to retrieve concept: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to retrieve concept: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "browse_knowledge_shelf":
             domain = arguments["domain"]
+            limit = arguments.get("limit", 20)
+            offset = arguments.get("offset", 0)
 
             try:
-                shelf_data = await cme.browse_knowledge_shelf(domain)
-                response_text = json.dumps(shelf_data, indent=2, default=serialize_complex_objects)
+                result = await cme.browse_knowledge_shelf(domain, limit=limit, offset=offset)
+                response_text = json.dumps(result, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in browse_knowledge_shelf: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to browse knowledge shelf: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to browse knowledge shelf: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "query_blended_knowledge":
@@ -1183,20 +865,12 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             include_conversational = arguments.get("include_conversational", True)
 
             try:
-                result = await cme.query_blended_knowledge(
-                    query=query,
-                    include_formal=include_formal,
-                    include_conversational=include_conversational
-                )
+                result = await cme.query_blended_knowledge(query=query, include_formal=include_formal, include_conversational=include_conversational)
                 response_text = json.dumps(result, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in query_blended_knowledge: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to query blended knowledge: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to query blended knowledge: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "link_conversation_to_knowledge":
@@ -1204,26 +878,13 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
             document_concept_id = arguments.get("document_concept_id")
 
             try:
-                links = await cme.link_conversation_to_knowledge(
-                    conversation_id=conversation_id,
-                    document_concept_id=document_concept_id
-                )
-                response = {
-                    "status": "success",
-                    "conversation_id": conversation_id,
-                    "links_created": len(links),
-                    "links": links,
-                    "timestamp": datetime.now().isoformat()
-                }
+                links = await cme.link_conversation_to_knowledge(conversation_id=conversation_id, document_concept_id=document_concept_id)
+                response = {"status": "success", "conversation_id": conversation_id, "links_created": len(links), "links": links, "timestamp": datetime.now().isoformat()}
                 response_text = json.dumps(response, indent=2, default=serialize_complex_objects)
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in link_conversation_to_knowledge: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to link conversation to knowledge: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to link conversation to knowledge: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "set_model":
@@ -1234,11 +895,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in set_model: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to set model: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to set model: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "store_knowledge_from_url":
@@ -1250,11 +907,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in store_knowledge_from_url: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to store knowledge from URL: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to store knowledge from URL: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "store_knowledge_from_search":
@@ -1266,11 +919,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in store_knowledge_from_search: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to store knowledge from search: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to store knowledge from search: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         elif name == "enhance_existing_concept":
@@ -1282,11 +931,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
                 return [types.TextContent(type="text", text=response_text)]
             except Exception as e:
                 logger.error(f"Error in enhance_existing_concept: {str(e)}")
-                error_response = {
-                    "status": "error",
-                    "error": f"Failed to enhance existing concept: {str(e)}",
-                    "timestamp": datetime.now().isoformat()
-                }
+                error_response = {"status": "error", "error": f"Failed to enhance existing concept: {str(e)}", "timestamp": datetime.now().isoformat()}
                 return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
         else:
@@ -1294,12 +939,7 @@ async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.T
 
     except Exception as e:
         logger.error(f"Error executing tool {name}: {e}")
-        error_response = {
-            "error": str(e),
-            "tool": name,
-            "arguments": arguments,
-            "type": "tool_execution_error"
-        }
+        error_response = {"error": str(e), "tool": name, "arguments": arguments, "type": "tool_execution_error"}
         return [types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
 
 

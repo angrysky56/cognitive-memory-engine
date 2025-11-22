@@ -95,7 +95,7 @@ class DocumentStore:
                 "compression_ratio": document.compression_ratio,
                 "created": document.created.isoformat(),
                 "last_accessed": document.last_accessed.isoformat(),
-                "concepts": {}
+                "concepts": {},
             }
 
             # Serialize concepts
@@ -116,11 +116,11 @@ class DocumentStore:
                     "tags": concept.tags,
                     "confidence_score": concept.confidence_score,
                     "created": concept.created.isoformat(),
-                    "last_updated": concept.last_updated.isoformat()
+                    "last_updated": concept.last_updated.isoformat(),
                 }
 
             # Write to file
-            with open(doc_file, 'w') as f:
+            with open(doc_file, "w") as f:
                 json.dump(doc_data, f, indent=2)
 
             # Update concepts index
@@ -177,7 +177,7 @@ class DocumentStore:
                 total_concepts=doc_data["total_concepts"],
                 compression_ratio=doc_data["compression_ratio"],
                 created=datetime.fromisoformat(doc_data["created"]),
-                last_accessed=datetime.now()
+                last_accessed=datetime.now(),
             )
 
             # Deserialize concepts
@@ -198,7 +198,7 @@ class DocumentStore:
                     tags=concept_data["tags"],
                     confidence_score=concept_data["confidence_score"],
                     created=datetime.fromisoformat(concept_data["created"]),
-                    last_updated=datetime.fromisoformat(concept_data["last_updated"])
+                    last_updated=datetime.fromisoformat(concept_data["last_updated"]),
                 )
                 document.concepts[concept_id] = concept
 
@@ -236,18 +236,18 @@ class DocumentStore:
         # If not found, try fuzzy matching (partial name matches)
         for indexed_name, doc_id in self.concepts_index.items():
             # Check if query is contained in the indexed name or vice versa
-            if (concept_lower in indexed_name or
-                indexed_name in concept_lower or
+            if (
+                concept_lower in indexed_name
+                or indexed_name in concept_lower
+                or
                 # Handle abbreviated forms like "SPL" vs "SPL (Structural Prompt Language)"
-                concept_lower == indexed_name.split('(')[0].strip().lower()):
-
+                concept_lower == indexed_name.split("(")[0].strip().lower()
+            ):
                 document = await self.get_document(doc_id)
                 if document:
                     for concept in document.concepts.values():
-                        concept_name_base = concept.name.split('(')[0].strip().lower()
-                        if (concept.name.lower() == indexed_name or
-                            concept_name_base == concept_lower or
-                            concept_lower in concept.name.lower()):
+                        concept_name_base = concept.name.split("(")[0].strip().lower()
+                        if concept.name.lower() == indexed_name or concept_name_base == concept_lower or concept_lower in concept.name.lower():
                             logger.info(f"Found concept '{concept.name}' via fuzzy match for query '{concept_name}'")
                             return document, concept
 
@@ -273,8 +273,7 @@ class DocumentStore:
                 document = await self.get_document(doc_id)
                 if document:
                     for concept in document.concepts.values():
-                        if (concept.name.lower() == concept_name and
-                            (domain is None or concept.domain == domain)):
+                        if concept.name.lower() == concept_name and (domain is None or concept.domain == domain):
                             results.append((document, concept))
 
         return results
@@ -314,7 +313,7 @@ class DocumentStore:
                 subcategories=shelf_data["subcategories"],
                 tags=shelf_data["tags"],
                 created=datetime.fromisoformat(shelf_data["created"]),
-                last_accessed=datetime.now()
+                last_accessed=datetime.now(),
             )
 
             # Cache in memory
@@ -325,12 +324,14 @@ class DocumentStore:
             logger.error(f"Failed to load shelf {shelf_id}: {e}")
             return None
 
-    async def list_documents_by_domain(self, domain: KnowledgeDomain) -> list[DocumentRTM]:
+    async def list_documents_by_domain(self, domain: KnowledgeDomain, limit: int = 100, offset: int = 0) -> list[DocumentRTM]:
         """
-        List all documents in a knowledge domain.
+        List documents in a knowledge domain with pagination.
 
         Args:
             domain: Knowledge domain
+            limit: Maximum number of documents to return
+            offset: Number of documents to skip
 
         Returns:
             List of documents in the domain
@@ -340,7 +341,14 @@ class DocumentStore:
         # Get shelf for domain
         shelf = await self.get_shelf(domain)
         if shelf:
-            for doc_id in shelf.document_ids:
+            # Apply pagination to document IDs
+            start_idx = offset
+            end_idx = offset + limit
+
+            # Slice the document IDs first to avoid loading unnecessary documents
+            paginated_ids = shelf.document_ids[start_idx:end_idx]
+
+            for doc_id in paginated_ids:
                 document = await self.get_document(doc_id)
                 if document:
                     documents.append(document)
@@ -378,7 +386,7 @@ class DocumentStore:
                 document_ids=[document.doc_id],
                 featured_concepts=[document.root_concept_id],
                 created=datetime.now(),
-                last_accessed=datetime.now()
+                last_accessed=datetime.now(),
             )
         else:
             # Add to existing shelf
@@ -406,10 +414,10 @@ class DocumentStore:
                 "subcategories": shelf.subcategories,
                 "tags": shelf.tags,
                 "created": shelf.created.isoformat(),
-                "last_accessed": shelf.last_accessed.isoformat()
+                "last_accessed": shelf.last_accessed.isoformat(),
             }
 
-            with open(shelf_file, 'w') as f:
+            with open(shelf_file, "w") as f:
                 json.dump(shelf_data, f, indent=2)
 
             # Cache in memory
@@ -421,7 +429,7 @@ class DocumentStore:
     async def _save_concepts_index(self) -> None:
         """Save concepts index to disk."""
         try:
-            with open(self.concepts_index_file, 'w') as f:
+            with open(self.concepts_index_file, "w") as f:
                 json.dump(self.concepts_index, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to save concepts index: {e}")
@@ -436,11 +444,4 @@ class DocumentStore:
         for document in self.documents.values():
             total_concepts += len(document.concepts)
 
-        return {
-            "total_documents": total_documents,
-            "total_shelves": total_shelves,
-            "total_concepts": total_concepts,
-            "loaded_documents": len(self.documents),
-            "loaded_shelves": len(self.shelves),
-            "concepts_indexed": len(self.concepts_index)
-        }
+        return {"total_documents": total_documents, "total_shelves": total_shelves, "total_concepts": total_concepts, "loaded_documents": len(self.documents), "loaded_shelves": len(self.shelves), "concepts_indexed": len(self.concepts_index)}
